@@ -1,7 +1,3 @@
-Sure! Here's a clean, professional README template for your **Rishadblack/Ireports** Laravel report package, based on the features and structure you've shared:
-
----
-
 # Rishadblack/Ireports
 
 A reusable, extensible Laravel reporting package with Livewire integration for dynamic filters, PDF and Excel export, and iframe report viewing.
