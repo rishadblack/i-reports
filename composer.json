@@ -1,0 +1,50 @@
+{
+    "name": "rishadblack/i-reports",
+    "description": ":Reusable and extensible Laravel reporting package featuring dynamic report loading, Livewire-driven filters, export to PDF and Excel using blade views, and support for modular applications.",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "S M Rishad",
+            "email": "rishad.black@gmail.com",
+            "homepage": "https://smrishad.com"
+        }
+    ],
+    "homepage": "https://github.com/rishadblack/i-reports",
+    "keywords": [
+        "Laravel",
+        "IReports"
+    ],
+    "version": "1.0.3",
+    "require": {
+        "php": "^8.1",
+        "illuminate/support": "^9.0|^10.0|^11.0",
+        "maatwebsite/excel": "^3.1",
+        "barryvdh/laravel-snappy": "^1.0",
+        "carlos-meneses/laravel-mpdf": "^2.1",
+        "h4cc/wkhtmltopdf-amd64": "^0.12.4"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "~9.0",
+        "orchestra/testbench": "~7"
+    },
+    "autoload": {
+        "psr-4": {
+            "Rishadblack\\IReports\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Rishadblack\\IReports\\Tests\\": "tests"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Rishadblack\\IReports\\IReportsServiceProvider"
+            ],
+            "aliases": {
+                "IReports": "Rishadblack\\IReports\\Facades\\IReports"
+            }
+        }
+    }
+}
