@@ -2,6 +2,7 @@
 namespace Rishadblack\IReports;
 
 use Illuminate\Support\ServiceProvider;
+use Livewire\Livewire;
 
 class IReportsServiceProvider extends ServiceProvider
 {
@@ -13,9 +14,11 @@ class IReportsServiceProvider extends ServiceProvider
     public function boot(): void
     {
         // $this->loadTranslationsFrom(__DIR__.'/../resources/lang', 'rishadblack');
-        // $this->loadViewsFrom(__DIR__.'/../resources/views', 'rishadblack');
+        $this->loadViewsFrom(__DIR__ . '/../resources/views', 'i-reports');
         // $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
         $this->loadRoutesFrom(__DIR__ . '/routes/web.php');
+
+        Livewire::component('i-reports.report-viewer', \Rishadblack\IReports\Http\Livewire\ReportViewer::class);
 
         // Publishing is only necessary when using the CLI.
         if ($this->app->runningInConsole()) {
@@ -61,9 +64,9 @@ class IReportsServiceProvider extends ServiceProvider
         ], 'i-reports.config');
 
         // Publishing the views.
-        /*$this->publishes([
-            __DIR__.'/../resources/views' => base_path('resources/views/vendor/rishadblack'),
-        ], 'i-reports.views');*/
+        $this->publishes([
+            __DIR__ . '/../resources/views' => base_path('resources/views/vendor/rishadblack'),
+        ], 'i-reports.views');
 
         // Publishing assets.
         /*$this->publishes([

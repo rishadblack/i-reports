@@ -1,120 +1,20 @@
 <?php
 namespace Rishadblack\IReports\Traits;
 
+use Illuminate\Http\Request;
 use Illuminate\Support\Str;
-use Livewire\Features\SupportConsoleCommands\Commands\ComponentParser;
+use ReflectionClass;
 
 trait Helpers
 {
-    protected $report_view;
-    protected $button_view;
-    protected $pdf_view;
-    protected $excel_view;
-    protected $filter_view;
-    protected $filter_extended_view;
     protected $file_name;
     protected $file_title;
-    protected $pagination = 10;
+    protected $pagination;
+    protected $pagination_list = [];
     protected $paper_size;
     protected $orientation;
     protected $default_sort_field;
     protected $default_sort_direction;
-
-    public function setReportView(string $reportView)
-    {
-        $this->report_view = $reportView;
-        return $this;
-    }
-
-    public function getReportView(): string
-    {
-        if ($this->report_view) {
-            return $this->report_view;
-        }
-
-        // Get the full class name of the current instance
-        $fullClassName = get_class($this);
-
-        // Extract the namespace parts
-        $namespaceParts = explode('\\', $fullClassName);
-        $reportIndex = array_search('Reports', $namespaceParts);
-
-        // Check if 'Reports' exists in the namespace
-        if ($reportIndex !== false) {
-            // Extract everything after 'Reports'
-            $subNamespaceParts = array_slice($namespaceParts, $reportIndex);
-
-            // Combine sub-namespace and view name to create the view path
-            $subNamespace = implode('.', $subNamespaceParts);
-
-            // Use ComponentParser to construct the parser
-            $parser = new ComponentParser(
-                config('livewire.class_namespace'),
-                config('livewire.view_path'),
-                $subNamespace
-            );
-
-            return str_replace('.', '/', $parser->viewName()); // Return the view path
-        }
-
-        // Handle case where 'Reports' is not found in the namespace
-        throw new \Exception("Reports namespace not found in class: {$fullClassName}");
-    }
-
-    public function setButtonView(string $buttonView)
-    {
-        $this->button_view = $buttonView;
-        return $this;
-    }
-
-    public function getButtonView(): string | null
-    {
-        return $this->button_view;
-    }
-
-    public function setPdfView(string $pdfView)
-    {
-        $this->pdf_view = $pdfView;
-        return $this;
-    }
-
-    public function getPdfView(): string
-    {
-        return $this->pdf_view ?? $this->getReportView();
-    }
-
-    public function setExcelView(string $excelView)
-    {
-        $this->excel_view = $excelView;
-        return $this;
-    }
-
-    public function getExcelView(): string
-    {
-        return $this->excel_view ?? $this->getReportView();
-    }
-
-    public function setFilterView(string $filterView)
-    {
-        $this->filter_view = $filterView;
-        return $this;
-    }
-
-    public function getFilterView(): string
-    {
-        return $this->filter_view ?? 'wire-reports::filters.default';
-    }
-
-    public function setFilterExtendedView(string $filterExtendedView)
-    {
-        $this->filter_extended_view = $filterExtendedView;
-        return $this;
-    }
-
-    public function getFilterExtendedView(): string
-    {
-        return $this->filter_extended_view;
-    }
 
     public function setFileName(string $fileName)
     {
@@ -124,7 +24,19 @@ trait Helpers
 
     public function getFileName(): string
     {
-        return $this->file_name ?? config('wire-reports.default_download_file_name');
+        // Get short class name like 'UsersReport'
+        $className = (new ReflectionClass($this))->getShortName();
+
+        // Remove trailing 'Report' suffix if exists
+        // $className = preg_replace('/Report$/', '', $className);
+
+        // Convert to snake_case, e.g. 'Users' or 'Sales'
+        $className = Str::kebab($className);
+
+        // Append datetime suffix, e.g. _20250729_143012
+        $datetime = now()->format('ymd-His');
+
+        return $this->file_name ?? "{$className}-{$datetime}";
     }
 
     public function setFileTitle(string $fileTitle)
@@ -135,7 +47,7 @@ trait Helpers
 
     public function getFileTitle(): string
     {
-        return $this->file_title ?? Str::title(Str::snake($this->getFileName(), config('wire-reports.default_download_file_name')));
+        return $this->file_title ?? Str::title(Str::snake($this->getFileName()));
     }
 
     public function setPagination(int $pagination)
@@ -146,7 +58,18 @@ trait Helpers
 
     public function getPagination(): int
     {
-        return $this->pagination;
+        return $this->pagination ?? config('i-reports.default_pagination');
+    }
+
+    public function setPaginationList(array $paginationList)
+    {
+        $this->pagination_list = $paginationList;
+        return $this;
+    }
+
+    public function getPaginationList(): array
+    {
+        return count($this->pagination_list) > 0 ? $this->pagination_list : config('i-reports.default_pagination_list');
     }
 
     public function setPaperSize(string $paperSize)
@@ -157,7 +80,7 @@ trait Helpers
 
     public function getPaperSize(): string
     {
-        return $this->paper_size ?? config('wire-reports.pdf_paper_size');
+        return $this->paper_size ?? config('i-reports.pdf_paper_size');
     }
 
     public function setOrientation(string $orientation)
@@ -168,7 +91,7 @@ trait Helpers
 
     public function getOrientation(): string
     {
-        return $this->orientation ?? config('wire-reports.pdf_orientation');
+        return $this->orientation ?? config('i-reports.pdf_orientation');
     }
 
     public function getFilter(string $filterName): string | bool
@@ -187,4 +110,23 @@ trait Helpers
     {
         return [$this->default_sort_field, $this->default_sort_direction];
     }
+
+    public function getPaginationInfo(array $arguments, int $perPage, int $page): array
+    {
+        $request = new Request($arguments);
+
+        $query = $this->builder($request);
+        $query = $this->applyFilters($request, $query);
+        $query = $this->applySearch($request, $query);
+
+        $total = $query->count();
+
+        return [
+            'total' => $total,
+            'per_page' => $perPage,
+            'current_page' => $page,
+            'last_page' => (int) ceil($total / $perPage),
+        ];
+    }
+
 }

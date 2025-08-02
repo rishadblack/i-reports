@@ -9,37 +9,23 @@ use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\Str;
 use ReflectionClass;
+use Rishadblack\IReports\Traits\Helpers;
+use Rishadblack\IReports\Traits\SearchableQuery;
 use Rishadblack\IReports\Traits\WithExcel;
+use Rishadblack\IReports\Traits\WithMpdfPdf;
 
 abstract class BaseReportController extends Controller
 {
-    use WithExcel;
+    use WithExcel, WithMpdfPdf, Helpers, SearchableQuery;
+
+    public function __construct()
+    {
+        $this->configure(); // 👈 this ensures it's always called
+    }
 
     public function configure(): void
     {
         // Child classes can override to set config, e.g. filename
-    }
-
-    /**
-     * Get filename with class-based name plus datetime suffix
-     *
-     * @return string
-     */
-    public function getFileName(): string
-    {
-        // Get short class name like 'UsersReport'
-        $className = (new ReflectionClass($this))->getShortName();
-
-        // Remove trailing 'Report' suffix if exists
-        $baseName = preg_replace('/Report$/', '', $className);
-
-        // Convert to snake_case, e.g. 'Users' or 'Sales'
-        $snakeName = Str::snake($baseName);
-
-        // Append datetime suffix, e.g. _20250729_143012
-        $datetime = now()->format('Ymd_His');
-
-        return "{$snakeName}_{$datetime}";
     }
 
     /**
@@ -53,6 +39,11 @@ abstract class BaseReportController extends Controller
     public function filters(): array
     {
         return [];
+    }
+
+    public function searchFields(): array
+    {
+        return ['name'];
     }
 
     /**
@@ -72,12 +63,23 @@ abstract class BaseReportController extends Controller
         return $query;
     }
 
+    protected function applySearch(Request $request, Builder $query): Builder
+    {
+        $search = $request->input('search');
+
+        if ($search && $fields = $this->searchFields()) {
+            return $this->applySearchable($query, $fields, $search);
+        }
+
+        return $query;
+    }
+
     /**
      * Default pagination method.
      */
     protected function paginate(Builder $query, int $perPage = null)
     {
-        $perPage = $perPage ?? request()->input('per_page', 15);
+        $perPage = $perPage ?? request()->input('per_page', $this->getPagination());
         return $query->paginate($perPage)->appends(request()->except('page'));
     }
 
@@ -92,10 +94,9 @@ abstract class BaseReportController extends Controller
     /**
      * Export to PDF using DomPDF.
      */
-    protected function exportPdf(string $view, array $data = [], string $filename = 'report.pdf')
+    protected function exportPdf(string $view, array $data = [])
     {
-        $pdf = Pdf::loadView($view, $data);
-        return $pdf->download($filename);
+        return $this->pdfExportByMpdf($view, $data);
     }
 
     public function map(Collection $collection): Collection
@@ -109,16 +110,16 @@ abstract class BaseReportController extends Controller
     public function view(Request $request)
     {
         $export = $request->input('export');
-
-        $this->configure();
+        $perPage = $request->input('per_page') ?? $this->getPagination();
 
         $query = $this->builder($request);
 
         $query = $this->applyFilters($request, $query);
+        $query = $this->applySearch($request, $query);
 
         // If export is requested, handle it
         if (! in_array($export, ['print', 'xlsx', 'csv', 'pdf'])) {
-            $data = $this->paginate($query);
+            $data = $this->paginate($query, $perPage);
 
             $data->setCollection(
                 $this->map($data->getCollection())
@@ -152,4 +153,5 @@ abstract class BaseReportController extends Controller
 
         return "reports.{$viewName}";
     }
+
 }
