@@ -20,7 +20,7 @@ A reusable, extensible Laravel reporting package with Livewire integration for d
 ## Installation
 
 ```bash
-composer require rishadblack/ireports
+composer require rishadblack/i-reports
 ```
 
 Publish config file (optional):
