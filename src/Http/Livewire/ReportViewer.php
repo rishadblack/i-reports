@@ -81,6 +81,7 @@ class ReportViewer extends Component
             'per_page' => $this->per_page,
             'page' => $this->page,
             'search' => $this->search,
+            'export' => 'view',
         ]);
 
         $this->updatePaginationInfo();

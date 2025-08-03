@@ -1,6 +1,8 @@
 <?php
 namespace Rishadblack\IReports;
 
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
 
@@ -13,12 +15,19 @@ class IReportsServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // $this->loadTranslationsFrom(__DIR__.'/../resources/lang', 'rishadblack');
+        Blade::componentNamespace('Rishadblack\\IReports\\View\\Components', 'i-reports');
+        $this->loadTranslationsFrom(__DIR__ . '/../resources/lang', 'i-reports');
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'i-reports');
         // $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
         $this->loadRoutesFrom(__DIR__ . '/routes/web.php');
 
+        // View::composer('i-reports::*');
+
         Livewire::component('i-reports.report-viewer', \Rishadblack\IReports\Http\Livewire\ReportViewer::class);
+
+        View::composer('i-reports::*', function ($view) {
+            $view->with('export', \Rishadblack\IReports\Helpers\ReportExportHelper::getExport());
+        });
 
         // Publishing is only necessary when using the CLI.
         if ($this->app->runningInConsole()) {

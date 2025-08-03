@@ -9,6 +9,7 @@ use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\Str;
 use ReflectionClass;
+use Rishadblack\IReports\Helpers\ReportExportHelper;
 use Rishadblack\IReports\Traits\Helpers;
 use Rishadblack\IReports\Traits\SearchableQuery;
 use Rishadblack\IReports\Traits\WithExcel;
@@ -96,7 +97,9 @@ abstract class BaseReportController extends Controller
      */
     protected function exportPdf(string $view, array $data = [])
     {
-        return $this->pdfExportByMpdf($view, $data);
+        if (config('i-reports.pdf_export_by')) {
+            return $this->pdfExportByMpdf($view, $data);
+        }
     }
 
     public function map(Collection $collection): Collection
@@ -128,6 +131,8 @@ abstract class BaseReportController extends Controller
         } else {
             $data = $this->map($query->get());
         }
+
+        ReportExportHelper::setExport($export);
 
         if (in_array($export, ['xlsx', 'csv'])) {
             return $this->exportExcelFromView($this->getViewName(), ['data' => $data, 'export' => $export], $export);
