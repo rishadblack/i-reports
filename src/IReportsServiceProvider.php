@@ -26,7 +26,7 @@ class IReportsServiceProvider extends ServiceProvider
         Livewire::component('i-reports.report-viewer', \Rishadblack\IReports\Http\Livewire\ReportViewer::class);
 
         View::composer('i-reports::*', function ($view) {
-            $view->with('export', \Rishadblack\IReports\Helpers\ReportExportHelper::getExport());
+            $view->with('export', \Rishadblack\IReports\Helpers\ReportHelper::getExport());
         });
 
         // Publishing is only necessary when using the CLI.

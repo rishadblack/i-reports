@@ -4,6 +4,7 @@ namespace Rishadblack\IReports\Http\Livewire;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Livewire\WithPagination;
+use Rishadblack\IReports\Services\ReportTokenManager;
 use Rishadblack\IReports\Traits\HasReportClass;
 
 class ReportViewer extends Component
@@ -25,6 +26,16 @@ class ReportViewer extends Component
     protected $queryString = ['filters', 'search', 'per_page', 'page'];
 
     public string $orientation = 'fullpage'; // default
+
+    protected function rules()
+    {
+        return [
+            'search' => 'nullable|string|max:255',
+            'export' => 'nullable|in:print,xlsx,csv,pdf',
+            'page' => 'nullable|integer|min:1|max:' . $this->last_page,
+            'per_page' => 'nullable|integer|min:1|max:100',
+        ];
+    }
 
     public function setOrientation(string $orientation)
     {
@@ -77,18 +88,17 @@ class ReportViewer extends Component
     #[Computed]
     public function reportUrl(): string
     {
-        $this->requestDatas = array_merge($this->filters, [
-            'per_page' => $this->per_page,
-            'page' => $this->page,
+        $requestDatas = array_merge($this->filters, [
             'search' => $this->search,
             'export' => 'view',
+            'report' => $this->report,
         ]);
 
         $this->updatePaginationInfo();
 
-        $query = http_build_query($this->requestDatas);
+        $token = ReportTokenManager::store($requestDatas);
 
-        return route('ireport.view', ['report' => $this->report]) . '?' . $query;
+        return route('i-reports.view', ['per_page' => $this->per_page, 'page' => $this->page, 'token' => $token]);
     }
 
     #[Computed]
@@ -109,12 +119,15 @@ class ReportViewer extends Component
             return;
         }
 
-        $query = http_build_query(array_merge($this->filters, [
-            'export' => $format,
+        $requestDatas = array_merge($this->filters, [
             'search' => $this->search,
-        ]));
+            'export' => $format,
+            'report' => $this->report,
+        ]);
 
-        $url = route('ireport.view', ['report' => $this->report]) . '?' . $query;
+        $token = ReportTokenManager::store($requestDatas);
+
+        $url = route('i-reports.view', ['token' => $token]);
 
         $this->dispatch('exportEvent', ['url' => $url]);
 
@@ -145,15 +158,13 @@ class ReportViewer extends Component
 
         $reportInstance = app($reportInstance);
 
-        $this->requestDatas = array_merge($this->filters, [
-            'per_page' => $this->per_page,
-            'page' => $this->page,
+        $requestDatas = array_merge($this->filters, [
             'search' => $this->search,
         ]);
 
         if (method_exists($reportInstance, 'getPaginationInfo')) {
             $paginationInfo = $reportInstance->getPaginationInfo(
-                $this->requestDatas,
+                $requestDatas,
                 $this->per_page,
                 $this->page
             );
@@ -168,7 +179,7 @@ class ReportViewer extends Component
     public function render()
     {
         return view('i-reports::livewire.report-viewer', [
-            'reportUrl' => $this->reportUrl, // ✅ passes computed property
+            'reportUrl' => $this->reportUrl,
         ]);
     }
 }

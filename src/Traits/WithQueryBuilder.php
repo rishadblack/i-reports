@@ -2,11 +2,78 @@
 namespace Rishadblack\IReports\Traits;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Arr;
+use Rishadblack\IReports\Helpers\ReportHelper;
 
-trait SearchableQuery
+trait WithQueryBuilder
 {
-    public function applySearchable(Builder $query, array $attributes, string $searchTerm): Builder
+    public function baseBuilder(Request $request): Builder
+    {
+        $builder = $this->builder(); // Start with the base quesy.
+        $builder = $this->applyFilters($builder, $request);
+        $builder = $this->applySearch($builder, $request);
+        $builder = $this->applySort($builder, $request);
+
+        return $builder;
+    }
+
+    public function paginate(Builder $query): LengthAwarePaginator
+    {
+        $perPage = ReportHelper::getPerPage($this->getPagination());
+
+        return $query->paginate($perPage)->appends(request()->except('page'));
+    }
+
+    protected function applyFilters(Builder $builder, Request $request): Builder
+    {
+        foreach ($this->filters() as $filter) {
+            $field = $filter->getField();
+
+            if ($request->filled($field)) {
+                $value = $request->input($field);
+                $filter->apply($builder, $value);
+            }
+        }
+
+        return $builder;
+    }
+
+    protected function applySearch(Builder $builder, Request $request): Builder
+    {
+        $search = (string) $request->input('search');
+
+        $fields = $this->getSearchField();
+
+        if ($search && ! empty($search)) {
+            if (count($fields) > 0) {
+                $builder = $this->applySearchable($builder, $fields, $search);
+            }
+            return $this->search($builder, $search, $request);
+        }
+
+        return $builder;
+    }
+
+    protected function applySort(Builder $builder, Request $request): Builder
+    {
+        $sortField = $request->input('sort_field');
+        $sortDirection = strtolower($request->input('sort_direction', 'asc'));
+
+        $allowedDirections = ['asc', 'desc'];
+        if (! in_array($sortDirection, $allowedDirections)) {
+            $sortDirection = 'asc';
+        }
+
+        if ($sortField) {
+            $builder->orderBy($sortField, $sortDirection);
+        }
+
+        return $builder;
+    }
+
+    protected function applySearchable(Builder $query, array $attributes, string $searchTerm): Builder
     {
         $query->where(function (Builder $query) use ($attributes, $searchTerm) {
             $model = $query->getModel();

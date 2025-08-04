@@ -1,93 +1,50 @@
 <?php
 namespace Rishadblack\IReports;
 
-use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Illuminate\Support\Facades\View;
-use Illuminate\Support\Str;
-use ReflectionClass;
-use Rishadblack\IReports\Helpers\ReportExportHelper;
+use Illuminate\View\View;
+use Rishadblack\IReports\Helpers\ReportHelper;
 use Rishadblack\IReports\Traits\Helpers;
-use Rishadblack\IReports\Traits\SearchableQuery;
 use Rishadblack\IReports\Traits\WithExcel;
 use Rishadblack\IReports\Traits\WithMpdfPdf;
+use Rishadblack\WireReports\Traits\WithQueryBuilder;
 
 abstract class BaseReportController extends Controller
 {
-    use WithExcel, WithMpdfPdf, Helpers, SearchableQuery;
+    use WithQueryBuilder, WithExcel, WithMpdfPdf, Helpers;
 
     public function __construct()
     {
-        $this->configure(); // 👈 this ensures it's always called
+        $this->configure();
     }
 
-    public function configure(): void
+    abstract public function builder(): Builder;
+    abstract public function configure(): void;
+    abstract public function columns(): array;
+
+    public function additionalData(): array
     {
-        // Child classes can override to set config, e.g. filename
+        return [];
     }
 
-    /**
-     * Child classes must return a query builder for the report data.
-     */
-    abstract public function builder(Request $request): Builder;
-
-    /**
-     * Child classes can return an array of Filter objects.
-     */
+    // Make filters optional by providing a default empty implementation
     public function filters(): array
     {
         return [];
     }
 
-    public function searchFields(): array
+    public function search(Builder $builder, string $search): Builder
     {
-        return ['name'];
-    }
-
-    /**
-     * Apply filters from request input using the filters() method.
-     */
-    protected function applyFilters(Request $request, Builder $query): Builder
-    {
-        foreach ($this->filters() as $filter) {
-            $field = $filter->getField();
-
-            if ($request->filled($field)) {
-                $value = $request->input($field);
-                $filter->apply($query, $value);
-            }
-        }
-
-        return $query;
-    }
-
-    protected function applySearch(Request $request, Builder $query): Builder
-    {
-        $search = $request->input('search');
-
-        if ($search && $fields = $this->searchFields()) {
-            return $this->applySearchable($query, $fields, $search);
-        }
-
-        return $query;
-    }
-
-    /**
-     * Default pagination method.
-     */
-    protected function paginate(Builder $query, int $perPage = null)
-    {
-        $perPage = $perPage ?? request()->input('per_page', $this->getPagination());
-        return $query->paginate($perPage)->appends(request()->except('page'));
+        return $builder;
     }
 
     /**
      * Render the report blade view.
      */
-    protected function renderReport(string $view, $data = [])
+    protected function renderReport(string $view, $data = []): View
     {
         return view($view, $data);
     }
@@ -112,17 +69,13 @@ abstract class BaseReportController extends Controller
      */
     public function view(Request $request)
     {
-        $export = $request->input('export');
-        $perPage = $request->input('per_page') ?? $this->getPagination();
+        $export = ReportHelper::getExport();
 
-        $query = $this->builder($request);
-
-        $query = $this->applyFilters($request, $query);
-        $query = $this->applySearch($request, $query);
+        $query = $this->baseBuilder($request);
 
         // If export is requested, handle it
         if (! in_array($export, ['print', 'xlsx', 'csv', 'pdf'])) {
-            $data = $this->paginate($query, $perPage);
+            $data = $this->paginate($query);
 
             $data->setCollection(
                 $this->map($data->getCollection())
@@ -132,8 +85,6 @@ abstract class BaseReportController extends Controller
             $data = $this->map($query->get());
         }
 
-        ReportExportHelper::setExport($export);
-
         if (in_array($export, ['xlsx', 'csv'])) {
             return $this->exportExcelFromView($this->getViewName(), ['data' => $data, 'export' => $export], $export);
         } elseif ($export === 'pdf') {
@@ -142,21 +93,4 @@ abstract class BaseReportController extends Controller
 
         return $this->renderReport($this->getViewName(), ['data' => $data, 'export' => $export]);
     }
-
-    /**
-     * Default implementation automatically determines view path from class name.
-     */
-    protected function getViewName(): string
-    {
-        // Get short class name like 'UsersReport'
-        $className = (new ReflectionClass($this))->getShortName();
-        // Remove trailing 'Controller' suffix if exists
-        $baseName = preg_replace('/Controller$/', '', $className);
-
-        // Convert to snake_case, e.g. 'reports.users'
-        $viewName = Str::snake($baseName, '-');
-
-        return "reports.{$viewName}";
-    }
-
 }

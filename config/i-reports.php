@@ -4,7 +4,8 @@ return [
     'report_namespace' => 'Reports',
     'report_suffix' => '',       // No suffix
     'route_prefix' => 'ireport', // Default route prefix
-    'route_middleware' => [],    // Default route middleware
+    'use_cache_token' => false,
+    'route_middleware' => [], // Default route middleware
     'default_pagination_list' => [50, 100, 150, 200, 250, 500],
     'pdf_export_by' => 'mpdf',       // snappy or mpdf
     'pdf_paper_size' => 'A4',        // A3, A4, A5, Legal, Letter, Tabloid

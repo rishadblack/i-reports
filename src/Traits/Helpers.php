@@ -15,6 +15,7 @@ trait Helpers
     protected $orientation;
     protected $default_sort_field;
     protected $default_sort_direction;
+    protected $search_field;
 
     public function setFileName(string $fileName)
     {
@@ -115,9 +116,7 @@ trait Helpers
     {
         $request = new Request($arguments);
 
-        $query = $this->builder($request);
-        $query = $this->applyFilters($request, $query);
-        $query = $this->applySearch($request, $query);
+        $query = $this->baseBuilder($request);
 
         $total = $query->count();
 
@@ -127,6 +126,64 @@ trait Helpers
             'current_page' => $page,
             'last_page' => (int) ceil($total / $perPage),
         ];
+    }
+
+    public function setSearchField(array | string $SearchField)
+    {
+        if (is_string($SearchField)) {
+            $SearchField = [$SearchField];
+        }
+
+        $this->search_field = $SearchField;
+
+        return $this;
+    }
+
+    public function getSearchField(): array
+    {
+        return $this->search_field ?? [];
+    }
+
+    public function getViewName(): string
+    {
+        $fullClassName = get_class($this);
+        $namespaceParts = explode('\\', $fullClassName);
+        $moduleNamespace = config('modules.namespace');
+        $moduleLivewireNamespace = config('modules-livewire.namespace');
+        $reportNamespaceSegment = config('i-reports.report_namespace');
+        $livewireNamespace = config('livewire.class_namespace');
+
+        // Detect module
+        if ($namespaceParts[0] === $moduleNamespace && isset($namespaceParts[1])) {
+            $moduleName = $namespaceParts[1];
+
+            // Find start index of Livewire\Reports\...
+            $livewireIndex = array_search($moduleLivewireNamespace, $namespaceParts);
+            if ($livewireIndex === false) {
+                throw new \Exception("Livewire namespace '{$moduleLivewireNamespace}' not found in: {$fullClassName}");
+            }
+
+            $subPathParts = array_slice($namespaceParts, $livewireIndex); // e.g. ['Livewire', 'Reports', 'Test', 'ReceivableReport']
+
+            // Remove the last class name and convert it to kebab-case
+            $componentParts = collect($subPathParts)
+                ->map(fn($part) => Str::kebab($part));
+
+            return strtolower($moduleName) . '::' . $componentParts->implode('.');
+        }
+
+        // Fallback: App\Livewire\Reports\...
+        $appLivewireIndex = array_search($livewireNamespace, $namespaceParts);
+        if ($appLivewireIndex !== false) {
+            $subPathParts = array_slice($namespaceParts, $appLivewireIndex); // ['Livewire', 'Reports', 'UsersReport']
+
+            $componentParts = collect($subPathParts)
+                ->map(fn($part) => Str::kebab($part));
+
+            return $componentParts->implode('.');
+        }
+
+        throw new \Exception("Unable to resolve Livewire view name for: {$fullClassName}");
     }
 
 }
