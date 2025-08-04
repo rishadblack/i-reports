@@ -1,5 +1,5 @@
 <?php
-namespace Rishadblack\WireReports\Views;
+namespace Rishadblack\IReports\Views;
 
 use Closure;
 use Illuminate\Database\Eloquent\Builder;

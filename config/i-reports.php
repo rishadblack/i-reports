@@ -28,4 +28,9 @@ return [
         ['type' => 'xlsx', 'name' => 'Excel', 'class' => 'btn-info'],
         ['type' => 'csv', 'name' => 'CSV', 'class' => 'btn-warning'],
     ],
+    'default_style' => [
+        'th' => "text-align: left; font-size: 14px; color: #ffffff; position: sticky; top: 0; background-color: #727070; padding: 6px;",
+        'td' => "text-align: left; padding: 5px; border: 1px solid #cccccc;",
+        'tr' => "border: 1px solid #cccccc;",
+    ],
 ];

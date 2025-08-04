@@ -9,12 +9,12 @@ use Rishadblack\IReports\Helpers\ReportHelper;
 
 trait WithQueryBuilder
 {
-    public function baseBuilder(Request $request): Builder
+    public function baseBuilder(): Builder
     {
         $builder = $this->builder(); // Start with the base quesy.
-        $builder = $this->applyFilters($builder, $request);
-        $builder = $this->applySearch($builder, $request);
-        $builder = $this->applySort($builder, $request);
+        $builder = $this->applyFilters($builder);
+        $builder = $this->applySearch($builder);
+        $builder = $this->applySort($builder);
 
         return $builder;
     }
@@ -26,40 +26,48 @@ trait WithQueryBuilder
         return $query->paginate($perPage)->appends(request()->except('page'));
     }
 
-    protected function applyFilters(Builder $builder, Request $request): Builder
+    protected function applyFilters(Builder $builder): Builder
     {
+        $filters = ReportHelper::getFilters();
+
         foreach ($this->filters() as $filter) {
             $field = $filter->getField();
 
-            if ($request->filled($field)) {
-                $value = $request->input($field);
-                $filter->apply($builder, $value);
+            if (array_key_exists($field, $filters) && filled($filters[$field])) {
+                $filter->apply($builder, $filters[$field]);
             }
         }
 
         return $builder;
     }
 
-    protected function applySearch(Builder $builder, Request $request): Builder
+    protected function applySearch(Builder $builder): Builder
     {
-        $search = (string) $request->input('search');
+        $search = ReportHelper::getSearch();
 
-        $fields = $this->getSearchField();
+        // Get searchable column names from columns()
+        $searchableColumns = collect($this->columns())
+            ->filter(fn($column) => $column->isSearchable())
+            ->map(fn($column) => $column->getName())
+            ->all();
+
+        // Merge with $this->getSearchField() (which may return extra fields)
+        $fields = array_values(array_unique(array_merge($this->getSearchField(), $searchableColumns)));
 
         if ($search && ! empty($search)) {
             if (count($fields) > 0) {
                 $builder = $this->applySearchable($builder, $fields, $search);
             }
-            return $this->search($builder, $search, $request);
+            return $this->search($builder, $search);
         }
 
         return $builder;
     }
 
-    protected function applySort(Builder $builder, Request $request): Builder
+    protected function applySort(Builder $builder): Builder
     {
-        $sortField = $request->input('sort_field');
-        $sortDirection = strtolower($request->input('sort_direction', 'asc'));
+        $sortField = ReportHelper::getSortField();
+        $sortDirection = ReportHelper::getSortDirection();
 
         $allowedDirections = ['asc', 'desc'];
         if (! in_array($sortDirection, $allowedDirections)) {

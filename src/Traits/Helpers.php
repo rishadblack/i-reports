@@ -1,7 +1,6 @@
 <?php
 namespace Rishadblack\IReports\Traits;
 
-use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use ReflectionClass;
 
@@ -9,6 +8,7 @@ trait Helpers
 {
     protected $file_name;
     protected $file_title;
+    protected $header_view;
     protected $pagination;
     protected $pagination_list = [];
     protected $paper_size;
@@ -16,6 +16,17 @@ trait Helpers
     protected $default_sort_field;
     protected $default_sort_direction;
     protected $search_field;
+
+    public function setHeaderView(int $header_view)
+    {
+        $this->header_view = $header_view;
+        return $this;
+    }
+
+    public function getHeaderView(): int
+    {
+        return $this->header_view ?? config('i-reports.default_pagination');
+    }
 
     public function setFileName(string $fileName)
     {
@@ -110,22 +121,6 @@ trait Helpers
     public function getDefaultSortField(): array
     {
         return [$this->default_sort_field, $this->default_sort_direction];
-    }
-
-    public function getPaginationInfo(array $arguments, int $perPage, int $page): array
-    {
-        $request = new Request($arguments);
-
-        $query = $this->baseBuilder($request);
-
-        $total = $query->count();
-
-        return [
-            'total' => $total,
-            'per_page' => $perPage,
-            'current_page' => $page,
-            'last_page' => (int) ceil($total / $perPage),
-        ];
     }
 
     public function setSearchField(array | string $SearchField)

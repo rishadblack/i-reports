@@ -8,7 +8,7 @@
             </div>
             <div class="col-auto">
                 <button type="submit" class="btn btn-primary btn-sm" wire:click='searchReport'>Search</button>
-                <button type="submit" class="btn btn-danger btn-sm" wire:click='reserReport'>Reset</button>
+                <button type="submit" class="btn btn-danger btn-sm" wire:click='resetReport'>Reset</button>
             </div>
             <div class="col-auto ms-auto">
                 <select wire:model.change="export" class="form-select form-select-sm">

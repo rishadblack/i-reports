@@ -1,7 +1,3 @@
-@props([
-    'header' => null,
-    'summary' => null,
-])
 @if (!in_array($export, ['csv', 'xlsx']))
     <!DOCTYPE html>
     <html lang="en">
@@ -32,11 +28,7 @@
 
     <body>
 @endif
-@if ($export)
-    {{ $header }}
-@endif
 
-{{ $summary }}
 {{ $slot }}
 
 

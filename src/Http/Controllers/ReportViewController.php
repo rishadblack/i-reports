@@ -2,6 +2,7 @@
 namespace Rishadblack\IReports\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Rishadblack\IReports\Helpers\ReportHelper;
 use Rishadblack\IReports\Helpers\RequestHelper;
 use Rishadblack\IReports\Services\ReportTokenManager;
 use Rishadblack\IReports\Traits\HasReportClass;
@@ -12,6 +13,7 @@ class ReportViewController
 
     public function __invoke(Request $request)
     {
+
         $token = $request->query('token');
 
         if ($token) {
@@ -26,19 +28,26 @@ class ReportViewController
             }
         }
 
-        $report = $request->query('report');
+        $requestHelper = new RequestHelper($request->all());
+        $requestHelper->storeGlobally();
+
+        $report = ReportHelper::getReport();
 
         if (! $report) {
-            abort(404, 'Invalid report.');
+            throw new \Exception("Report not found: {$report}");
         }
 
         $controllerClass = $this->findReportClass($report);
 
-        $requestHelper = new RequestHelper($request->all());
+        $reportInstance = app($controllerClass);
 
-        // Optionally store globally for easy static access
-        $requestHelper->storeGlobally();
+        if (! $reportInstance) {
+            throw new \Exception("Report class not found: {$controllerClass}");
 
-        return app($controllerClass)->view($request);
+        }
+
+        ReportHelper::setColumns($reportInstance->columns());
+
+        return $reportInstance->view();
     }
 }

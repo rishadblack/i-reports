@@ -3,14 +3,13 @@ namespace Rishadblack\IReports;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\View\View;
 use Rishadblack\IReports\Helpers\ReportHelper;
 use Rishadblack\IReports\Traits\Helpers;
 use Rishadblack\IReports\Traits\WithExcel;
 use Rishadblack\IReports\Traits\WithMpdfPdf;
-use Rishadblack\WireReports\Traits\WithQueryBuilder;
+use Rishadblack\IReports\Traits\WithQueryBuilder;
 
 abstract class BaseReportController extends Controller
 {
@@ -30,7 +29,6 @@ abstract class BaseReportController extends Controller
         return [];
     }
 
-    // Make filters optional by providing a default empty implementation
     public function filters(): array
     {
         return [];
@@ -41,17 +39,11 @@ abstract class BaseReportController extends Controller
         return $builder;
     }
 
-    /**
-     * Render the report blade view.
-     */
     protected function renderReport(string $view, $data = []): View
     {
         return view($view, $data);
     }
 
-    /**
-     * Export to PDF using DomPDF.
-     */
     protected function exportPdf(string $view, array $data = [])
     {
         if (config('i-reports.pdf_export_by')) {
@@ -64,16 +56,12 @@ abstract class BaseReportController extends Controller
         return $collection;
     }
 
-    /**
-     * Main entry point for route.
-     */
-    public function view(Request $request)
+    public function view()
     {
         $export = ReportHelper::getExport();
 
-        $query = $this->baseBuilder($request);
+        $query = $this->baseBuilder();
 
-        // If export is requested, handle it
         if (! in_array($export, ['print', 'xlsx', 'csv', 'pdf'])) {
             $data = $this->paginate($query);
 
@@ -85,12 +73,22 @@ abstract class BaseReportController extends Controller
             $data = $this->map($query->get());
         }
 
+        $data = [
+            'datas' => $data,
+            'columns' => $this->columns(),
+            'additional_datas' => $this->additionalData(),
+            'export' => $export,
+            'options' => [
+                'header_view' => $this->getHeaderView(),
+            ],
+        ];
+
         if (in_array($export, ['xlsx', 'csv'])) {
-            return $this->exportExcelFromView($this->getViewName(), ['data' => $data, 'export' => $export], $export);
+            return $this->exportExcelFromView($this->getViewName(), $data, $export);
         } elseif ($export === 'pdf') {
-            return $this->exportPdf($this->getViewName(), ['data' => $data, 'export' => $export]);
+            return $this->exportPdf($this->getViewName(), $data);
         }
 
-        return $this->renderReport($this->getViewName(), ['data' => $data, 'export' => $export]);
+        return $this->renderReport($this->getViewName(), $data);
     }
 }
