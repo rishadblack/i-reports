@@ -1,12 +1,13 @@
 <?php
 
 return [
-    'report_namespace' => 'Reports',
-    'report_suffix' => '',       // No suffix
+    'report_namespace' => null,
+    'report_suffix' => null,     // No suffix
     'route_prefix' => 'ireport', // Default route prefix
     'use_cache_token' => false,
     'route_middleware' => [], // Default route middleware
     'default_pagination_list' => [50, 100, 150, 200, 250, 500],
+    'header_view' => null,           // Default header view
     'pdf_export_by' => 'mpdf',       // snappy or mpdf
     'pdf_paper_size' => 'A4',        // A3, A4, A5, Legal, Letter, Tabloid
     'pdf_orientation' => 'portrait', // landscape or portrait

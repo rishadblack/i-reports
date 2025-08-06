@@ -14,13 +14,22 @@ class Th extends BaseComponent
     public ?Column $column;
     public ?string $style;
     public ?string $skip;
+    public ?string $custom;
 
-    public function __construct(?string $name = null, ?Column $column = null, ?string $style = null, ?string $skip = null)
+    protected static array $renderedColumns = [];
+
+    public function __construct(?string $name = null, ?Column $column = null, ?string $style = null, ?string $custom = null, ?string $skip = null)
     {
         $this->name = $name;
         $this->column = $column;
         $this->style = $style;
+        $this->custom = $custom;
         $this->skip = $skip;
+    }
+
+    public static function resetRenderedColumns(): void
+    {
+        self::$renderedColumns = [];
     }
 
     public function render()
@@ -34,6 +43,21 @@ class Th extends BaseComponent
             return '';
         }
 
+        // If custom passed, only render when it matches
+        if ($this->custom && $this->custom !== $this->name) {
+            return '';
+        }
+
+        // Skip if already rendered
+        if ($this->name && in_array($this->name, self::$renderedColumns)) {
+            return '';
+        }
+
+        // If custom passed, only render when it matches
+        if ($this->custom && $this->custom !== $this->name) {
+            return '';
+        }
+
         $columnStyle = null;
         if ($this->column) {
             $columnStyle = $this->column->applyStyle($this->row ?? null);
@@ -43,6 +67,11 @@ class Th extends BaseComponent
         $mergedStyle = $this->mergeStyles(config('i-reports.default_style.th'), $columnStyle);
         $mergedStyle = $this->mergeStyles($mergedStyle, $this->style);
         $this->style = $mergedStyle;
+
+        // Mark as rendered
+        if ($this->name) {
+            self::$renderedColumns[] = $this->name;
+        }
 
         if ($this->skip) {
             return '';

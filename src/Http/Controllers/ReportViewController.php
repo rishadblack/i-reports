@@ -47,6 +47,8 @@ class ReportViewController
         }
 
         ReportHelper::setColumns($reportInstance->columns());
+        ReportHelper::setReportTitle($reportInstance->getReportTitle());
+        ReportHelper::setHeaderTitle($reportInstance->getHeaderTitle());
 
         return $reportInstance->view();
     }

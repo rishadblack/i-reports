@@ -6,7 +6,7 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta http-equiv="X-UA-Compatible" content="ie=edge">
-        <title>Document</title>
+        <title>{{ $report_title }}</title>
         <style>
             @page {
                 header: page-header;
@@ -29,8 +29,9 @@
     <body>
 @endif
 
-{{ $slot }}
+@includeIf(config('i-reports.header_view'))
 
+{{ $slot }}
 
 @if (in_array($export, ['pdf', 'print']))
     @if (in_array($export, ['pdf']))
@@ -38,7 +39,7 @@
             <table width="100%" style="font-size: 8pt;">
                 <tr>
                     <td width="33%">{PAGENO}/{nbpg}</td>
-                    <td width="33%" align="center">{{ config('app.name') }}</td>
+                    <td width="33%" align="center">{{ $header_title . ' | ' . $report_title }}</td>
                     <td width="33%" align="right">{{ now()->format('d-m-Y H:i') }}</td>
                 </tr>
             </table>

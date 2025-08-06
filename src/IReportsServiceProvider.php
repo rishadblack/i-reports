@@ -28,6 +28,8 @@ class IReportsServiceProvider extends ServiceProvider
         View::composer('i-reports::*', function ($view) {
             $view->with('export', \Rishadblack\IReports\Helpers\ReportHelper::getExport());
             $view->with('columns', \Rishadblack\IReports\Helpers\ReportHelper::getColumns());
+            $view->with('report_title', \Rishadblack\IReports\Helpers\ReportHelper::getReportTitle());
+            $view->with('header_title', \Rishadblack\IReports\Helpers\ReportHelper::getHeaderTitle());
         });
 
         // Publishing is only necessary when using the CLI.

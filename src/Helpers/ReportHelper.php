@@ -7,6 +7,8 @@ class ReportHelper
 {
     protected static $requestData = null;
     protected static $columns     = [];
+    protected static $report_title;
+    protected static $header_title;
 
     public static function setRequestData(array $value): void
     {
@@ -31,6 +33,26 @@ class ReportHelper
             }
         }
         return null;
+    }
+
+    public static function setReportTitle(string $report_title): void
+    {
+        self::$report_title = $report_title;
+    }
+
+    public static function getReportTitle(): ?string
+    {
+        return self::$report_title;
+    }
+
+    public static function setHeaderTitle(string $header_title): void
+    {
+        self::$header_title = $header_title;
+    }
+
+    public static function getHeaderTitle(): ?string
+    {
+        return self::$header_title;
     }
 
     public static function getRequestData(): ?array

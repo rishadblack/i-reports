@@ -14,6 +14,11 @@ trait HasReportClass
         $reportNamespaceSegment = config('i-reports.report_namespace');  // e.g., 'Reports'
         $suffix = config('i-reports.report_suffix', '');                 // e.g., 'Report'
 
+        if ($reportNamespaceSegment) {
+            // Ensure the report namespace segment ends with a backslash
+            $reportNamespaceSegment = rtrim($reportNamespaceSegment, '\\') . '\\';
+        }
+
         // Module format: module::report.path-name
         if (str_contains($report, '::')) {
 
@@ -31,7 +36,7 @@ trait HasReportClass
                 ->implode('\\');
 
             // Build final class path
-            $class = "{$moduleNamespace}\\" . Str::studly($moduleName) . "\\{$moduleLivewireNamespace}\\{$reportNamespaceSegment}\\{$reportClassPath}{$suffix}";
+            $class = "{$moduleNamespace}\\" . Str::studly($moduleName) . "\\{$moduleLivewireNamespace}\\{$reportNamespaceSegment}{$reportClassPath}{$suffix}";
 
             if (class_exists($class)) {
                 return $class;
@@ -49,7 +54,7 @@ trait HasReportClass
             ->map(fn($segment) => Str::studly($segment))
             ->implode('\\');
 
-        $class = "{$livewireNamespace}\\{$reportNamespaceSegment}\\{$reportClassPath}{$suffix}";
+        $class = "{$livewireNamespace}\\{$reportNamespaceSegment}{$reportClassPath}{$suffix}";
 
         if (class_exists($class)) {
             return $class;

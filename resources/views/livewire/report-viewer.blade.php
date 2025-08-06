@@ -7,7 +7,8 @@
                     wire:keydown.enter="searchReport" style="min-width: 120px;" placeholder="Type to search" />
             </div>
             <div class="col-auto">
-                <button type="submit" class="btn btn-primary btn-sm" wire:click='searchReport'>Search</button>
+                <button type="submit" class="btn btn-primary btn-sm" wire:click='searchReport'
+                    :disabled="$wire.search.trim() === ''">Search</button>
                 <button type="submit" class="btn btn-danger btn-sm" wire:click='resetReport'>Reset</button>
             </div>
             <div class="col-auto ms-auto">

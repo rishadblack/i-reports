@@ -25,7 +25,6 @@ class Table extends BaseComponent
             }
 
         }
-
         return view('i-reports::components.table');
     }
 }

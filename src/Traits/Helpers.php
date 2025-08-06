@@ -1,11 +1,15 @@
 <?php
 namespace Rishadblack\IReports\Traits;
 
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Str;
 use ReflectionClass;
+use Rishadblack\IReports\Helpers\ReportHelper;
 
 trait Helpers
 {
+    protected $header_title;
+    protected $report_title;
     protected $file_name;
     protected $file_title;
     protected $header_view;
@@ -17,15 +21,41 @@ trait Helpers
     protected $default_sort_direction;
     protected $search_field;
 
-    public function setHeaderView(int $header_view)
+    public function setHeaderView(string $header_view)
     {
-        $this->header_view = $header_view;
+        // $this->header_view = $header_view;
+        Config::set('i-reports.header_view', $header_view);
         return $this;
     }
 
-    public function getHeaderView(): int
+    public function getHeaderView(): string | null
     {
-        return $this->header_view ?? config('i-reports.default_pagination');
+        // return $this->header_view;
+        return Config::get('i-reports.header_view', null);
+    }
+
+    public function setHeaderTitle(string $headerTitle)
+    {
+        $this->header_title = $headerTitle;
+        return $this;
+    }
+
+    public function getHeaderTitle(): string
+    {
+        return $this->header_title ?? config('app.name');
+    }
+
+    public function setReportTitle(string $reportTitle)
+    {
+        $this->report_title = $reportTitle;
+        return $this;
+    }
+
+    public function getReportTitle(): string
+    {
+        $className = (new ReflectionClass($this))->getShortName();
+
+        return $this->report_title ?? Str::title(Str::replace('_', ' ', Str::snake($className)));
     }
 
     public function setFileName(string $fileName)
@@ -38,9 +68,6 @@ trait Helpers
     {
         // Get short class name like 'UsersReport'
         $className = (new ReflectionClass($this))->getShortName();
-
-        // Remove trailing 'Report' suffix if exists
-        // $className = preg_replace('/Report$/', '', $className);
 
         // Convert to snake_case, e.g. 'Users' or 'Sales'
         $className = Str::kebab($className);
@@ -179,6 +206,55 @@ trait Helpers
         }
 
         throw new \Exception("Unable to resolve Livewire view name for: {$fullClassName}");
+    }
+
+    protected function exportPdf(string $view, array $data = [])
+    {
+        if (config('i-reports.pdf_export_by')) {
+            return $this->pdfExportByMpdf($view, $data);
+        }
+    }
+
+    protected function summeryData(): array
+    {
+        return $this->summaries($this->baseBuilder());
+    }
+
+    public function view()
+    {
+        $export = ReportHelper::getExport();
+
+        $query = $this->baseBuilder();
+
+        if (! in_array($export, ['print', 'xlsx', 'csv', 'pdf'])) {
+            $data = $this->paginate($query);
+
+            $data->setCollection(
+                $this->map($data->getCollection())
+            );
+
+        } else {
+            $data = $this->map($query->get());
+        }
+
+        $data = [
+            'datas' => $data,
+            'columns' => $this->columns(),
+            'additional_datas' => $this->additionalData(),
+            'summaries' => $this->summeryData(),
+            'export' => $export,
+            'options' => [
+                'header_view' => $this->getHeaderView(),
+            ],
+        ];
+
+        if (in_array($export, ['xlsx', 'csv'])) {
+            return $this->exportExcelFromView($this->getViewName(), $data, $export);
+        } elseif ($export === 'pdf') {
+            return $this->exportPdf($this->getViewName(), $data);
+        }
+
+        return $this->renderReport($this->getViewName(), $data);
     }
 
 }
