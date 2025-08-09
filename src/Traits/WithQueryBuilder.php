@@ -41,6 +41,11 @@ trait WithQueryBuilder
         return $this;
     }
 
+    public function getAdditionalSelects(): array
+    {
+        return $this->additionalSelects;
+    }
+
     public function getBuilder(): Builder
     {
         if (! isset($this->builder)) {
@@ -48,11 +53,6 @@ trait WithQueryBuilder
         }
 
         return $this->builder;
-    }
-
-    public function getAdditionalSelects(): array
-    {
-        return $this->additionalSelects;
     }
 
     public function baseBuilder(): Builder
