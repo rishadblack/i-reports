@@ -1,10 +1,12 @@
 <?php
 namespace Rishadblack\IReports\Traits;
 
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Str;
 use ReflectionClass;
 use Rishadblack\IReports\Helpers\ReportHelper;
+use Rishadblack\IReports\Views\Column;
 
 trait Helpers
 {
@@ -49,6 +51,26 @@ trait Helpers
     {
         $this->report_title = $reportTitle;
         return $this;
+    }
+
+    protected function setupColumns(): Collection
+    {
+        return collect($this->columns())
+            ->filter(fn($column) => $column instanceof Column)
+            ->map(function (Column $column) {
+                if ($column->isBaseColumn()) {
+                    $column->setTable($this->getBuilder()->getModel()->getTable());
+                } else {
+                    $column->setTable($this->getTableForColumn($column));
+                }
+                return $column;
+            });
+
+    }
+
+    public function getColumns(): Collection
+    {
+        return $this->setupColumns();
     }
 
     public function getReportTitle(): string
@@ -166,6 +188,13 @@ trait Helpers
         return $this->search_field ?? [];
     }
 
+    public function getSelectedColumnsForQuery(): Collection
+    {
+        return $this->getColumns()
+            ->reject(fn(Column $column) => $column->isHidden())
+            ->reject(fn(Column $column) => $column->isCustom());
+    }
+
     public function getViewName(): string
     {
         $fullClassName = get_class($this);
@@ -223,18 +252,19 @@ trait Helpers
     public function view()
     {
         $export = ReportHelper::getExport();
-
-        $query = $this->baseBuilder();
+        $this->baseBuilder();
+        $this->setBuilder($this->selectFields());
+        $this->setBuilder($this->additionalQuery($this->getBuilder()));
 
         if (! in_array($export, ['print', 'xlsx', 'csv', 'pdf'])) {
-            $data = $this->paginate($query);
+            $data = $this->paginate($this->getBuilder());
 
             $data->setCollection(
                 $this->map($data->getCollection())
             );
 
         } else {
-            $data = $this->map($query->get());
+            $data = $this->map($this->getBuilder()->get());
         }
 
         $data = [

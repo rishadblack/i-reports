@@ -28,6 +28,11 @@ abstract class BaseReportController extends Controller
         return [];
     }
 
+    public function additionalQuery(Builder $builder): Builder
+    {
+        return $builder;
+    }
+
     public function summaries(Builder $builder): array
     {
         return [];

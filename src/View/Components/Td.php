@@ -64,11 +64,8 @@ class Td extends BaseComponent
             return '';
         }
 
-        // Value + Formatting
-        $this->value = $this->row?->{ $this->name} ?? '';
-
-        if ($this->column) {
-            $this->value = $this->column->applyFormat($this->value, $this->row);
+        if ($this->column && $this->row) {
+            $this->value = $this->column->applyFormat($this->column->getValue($this->row), $this->row, $this->column);
         }
 
         // Style merging
