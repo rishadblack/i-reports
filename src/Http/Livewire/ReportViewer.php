@@ -11,6 +11,8 @@ class ReportViewer extends Component
     use HasReportClass, WithPagination, WithReportViewer;
 
     public $report;
+    public $filter_list = [];
+    public $filter_extended_view;
 
     protected $queryString = ['filters', 'search', 'per_page', 'page'];
 
@@ -30,6 +32,9 @@ class ReportViewer extends Component
 
         $this->per_page = $this->per_page ?? $reportInstance->getPagination();
         $this->per_page_list = $reportInstance->getPaginationList();
+        $this->filter_list = collect($reportInstance->filters())
+            ->map(fn($filter) => $filter->toArray())
+            ->all();
     }
 
     public function searchReport()
@@ -40,6 +45,16 @@ class ReportViewer extends Component
     public function resetReport()
     {
         $this->resetExcept(['report', 'per_page', 'per_page_list']);
+        $this->updatePaginationInfo();
+    }
+
+    public function filterReset()
+    {
+        $this->reset(['filters']);
+    }
+
+    public function filterSubmit()
+    {
         $this->updatePaginationInfo();
     }
 

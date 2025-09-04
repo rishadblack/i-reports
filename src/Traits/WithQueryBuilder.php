@@ -78,7 +78,7 @@ trait WithQueryBuilder
         $filters = ReportHelper::getFilters();
 
         foreach ($this->filters() as $filter) {
-            $field = $filter->getField();
+            $field = $filter->key();
 
             if (array_key_exists($field, $filters) && filled($filters[$field])) {
                 $filter->apply($this->getBuilder(), $filters[$field]);

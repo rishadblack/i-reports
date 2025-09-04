@@ -82,7 +82,7 @@ class ReportHelper
 
     public static function getFilters(): array
     {
-        return self::$requestData ?? [];
+        return self::$requestData['filters'] ?? [];
     }
 
     public static function getSearch(): string

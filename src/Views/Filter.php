@@ -16,7 +16,8 @@ class Filter
     protected $filterPillTitle;       // Title for filter pill in UI.
     protected $filterPillValues = []; // Values for displaying pills in UI.
     protected $filterCallback;        // Callback to apply the filter logic.
-    protected $searchComponent;       // Search component for the filter.
+    protected $component;             // Search component for the filter.
+    protected $componentParameters = [];
 
     /**
      * Create a new filter instance with a name and an optional column (ID).
@@ -90,10 +91,11 @@ class Filter
         return $this;
     }
 
-    public function searchComponent(string $search_component): self
+    public function component(string $component, array $componentParameters): self
     {
-        $this->filter_type = 'search_component';
-        $this->searchComponent = $search_component;
+        $this->filter_type = 'component';
+        $this->component = $component;
+        $this->componentParameters = $componentParameters;
         return $this;
     }
 
@@ -119,7 +121,8 @@ class Filter
             'placeholder' => $this->placeholder,
             'class' => $this->customClass,
             'filter_type' => $this->filter_type,
-            'search_component' => $this->searchComponent,
+            'component' => $this->component,
+            'component_parameters' => $this->componentParameters,
             'response_time' => $this->responseTime,
             'options' => $this->options,
         ];

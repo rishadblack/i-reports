@@ -223,8 +223,13 @@ trait Helpers
             return strtolower($moduleName) . '::' . $componentParts->implode('.');
         }
 
+        $livewireNamespaceParts = explode('\\', $livewireNamespace);
+        $firstMatch = $livewireNamespaceParts[0];          // "App"
+        $secondMatch = $livewireNamespaceParts[1] ?? null; // "Livewire"
+
         // Fallback: App\Livewire\Reports\...
-        $appLivewireIndex = array_search($livewireNamespace, $namespaceParts);
+        $appLivewireIndex = array_search($secondMatch, $namespaceParts);
+
         if ($appLivewireIndex !== false) {
             $subPathParts = array_slice($namespaceParts, $appLivewireIndex); // ['Livewire', 'Reports', 'UsersReport']
 

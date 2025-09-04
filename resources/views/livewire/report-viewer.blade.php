@@ -10,6 +10,9 @@
                 <button type="submit" class="btn btn-primary btn-sm" wire:click='searchReport'
                     :disabled="$wire.search.trim() === ''">Search</button>
                 <button type="submit" class="btn btn-danger btn-sm" wire:click='resetReport'>Reset</button>
+                <button type="button" class="btn btn-info btn-sm" data-bs-toggle="modal"
+                    data-bs-target="#filterModal">Filter</button>
+
             </div>
             <div class="col-auto ms-auto">
                 <select wire:model.change="export" class="form-select form-select-sm">
@@ -41,9 +44,6 @@
 
 
     {{-- Pagination controls --}}
-
-
-
     <div class="container">
         <div
             class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-4">
@@ -73,6 +73,65 @@
                         class="form-control" placeholder="Jump to page" />
                     <button class="btn btn-primary" type="submit" title="Go to page">Go</button>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    {{-- Filter Modal --}}
+    <div class="modal fade" id="filterModal" tabindex="-1" aria-labelledby="filterModalLabel" aria-hidden="true"
+        wire:ignore.self>
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h1 class="modal-title fs-5" id="filterModalLabel">Filter</h1>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    @foreach ($filter_list as $filter)
+                        @if ($filter['filter_type'] == 'select')
+                            <div class="{{ isset($filter['class']) ? $filter['class'] : 'col-lg-12' }}">
+                                <label for="{{ $filter['name'] }}">{{ $filter['title'] }}</label>
+                                <select wire:model="filters.{{ $filter['name'] }}" class="form-select">
+                                    <option value="">Select {{ $filter['title'] }}</option>
+                                    @foreach ($filter['options'] as $optionKey => $optionValue)
+                                        <option value="{{ $optionKey }}">{{ $optionValue }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        @elseif($filter['filter_type'] == 'text')
+                            <div class="{{ isset($filter['class']) ? $filter['class'] : 'col-lg-12' }}">
+                                <label for="{{ $filter['name'] }}">{{ $filter['title'] }}</label>
+                                <input wire:model="filters.{{ $filter['name'] }}" class="form-control"
+                                    placeholder="{{ $filter['placeholder'] }}" />
+                            </div>
+                        @elseif($filter['filter_type'] == 'component')
+                            <div class="{{ isset($filter['class']) ? $filter['class'] : 'col-lg-12' }}">
+                                @livewire(
+                                    $filter['component'],
+                                    array_merge(
+                                        [
+                                            'wire:model' => 'filters.' . $filter['name'],
+                                            'name' => $filter['name'],
+                                            'label' => $filter['title'],
+                                            'placeholder' => $filter['placeholder'],
+                                            'key' => 'filter-' . $filter['name'],
+                                        ],
+                                        $filter['component_parameters'],
+                                    )
+                                )
+                            </div>
+                        @endif
+                    @endforeach
+                    @includeIf($filter_extended_view)
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-sm btn-danger" wire:click="filterReset"
+                        wire:target="filterReset" wire:loading.attr="disabled">Reset Filter</button>
+                    <button type="button" class="btn btn-sm btn-primary" wire:click="filterSubmit"
+                        wire:target="filterSubmit" wire:loading.attr="disabled"
+                        data-bs-dismiss="modal">Submit</button>
+                </div>
             </div>
         </div>
     </div>

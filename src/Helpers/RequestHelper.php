@@ -53,13 +53,14 @@ class RequestHelper
     // Compose all request data for token or query building
     public function toArray(): array
     {
-        return array_merge($this->filters, [
+        return [
+            'filters' => $this->filters,
             'search' => $this->search,
             'export' => $this->export ?: 'view',
             'per_page' => $this->perPage,
             'page' => $this->page,
             'report' => $this->report,
-        ]);
+        ];
     }
 
     // Generate a report token for URL or export
