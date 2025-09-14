@@ -44,7 +44,7 @@ class ReportViewer extends Component
 
     public function resetReport()
     {
-        $this->resetExcept(['report', 'per_page', 'per_page_list']);
+        $this->resetExcept(['report', 'per_page', 'per_page_list', 'filter_list']);
         $this->updatePaginationInfo();
     }
 

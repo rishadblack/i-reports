@@ -85,8 +85,12 @@ class Filter
         return $this;
     }
 
-    public function select(): self
+    public function select(array $options = []): self
     {
+        if (count($options) > 0) {
+            $this->options = $options;
+        }
+
         $this->filter_type = 'select';
         return $this;
     }
