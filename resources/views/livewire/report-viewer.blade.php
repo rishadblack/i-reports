@@ -105,19 +105,18 @@
                                     placeholder="{{ $filter['placeholder'] }}" />
                             </div>
                         @elseif($filter['filter_type'] == 'component')
-                            <div class="{{ isset($filter['class']) ? $filter['class'] : 'col-lg-12' }}">
+                            <div class="{{ $filter['class'] ?? 'col-lg-12' }}"
+                                wire:key="filter-{{ $filter['name'] }}-wrapper-{{ $loop->index }}">
                                 @livewire(
                                     $filter['component'],
-                                    array_merge(
-                                        [
-                                            'wire:model' => 'filters.' . $filter['name'],
-                                            'name' => $filter['name'],
-                                            'label' => $filter['title'],
-                                            'placeholder' => $filter['placeholder'],
-                                            'key' => 'filter-' . $filter['name'],
-                                        ],
-                                        $filter['component_parameters'],
-                                    )
+                                    [
+                                        'wire:model' => 'filters.' . $filter['name'],
+                                        'name' => 'filters.' . $filter['name'],
+                                        'label' => $filter['title'],
+                                        'placeholder' => $filter['placeholder'],
+                                        'key' => 'filter-' . $filter['name'] . '-item-' . $loop->index,
+                                    ] + $filter['component_parameters'],
+                                    key('filter-' . $filter['name'] . '-' . $loop->index)
                                 )
                             </div>
                         @endif

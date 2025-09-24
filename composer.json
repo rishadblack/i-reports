@@ -14,7 +14,7 @@
         "Laravel",
         "IReports"
     ],
-    "version": "0.1.4",
+    "version": "0.1.5",
     "require": {
         "php": "^8.1|^8.2|^8.3",
         "illuminate/support": "^9.0|^10.0|^11.0|^12.0",

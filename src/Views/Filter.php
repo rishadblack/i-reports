@@ -95,7 +95,7 @@ class Filter
         return $this;
     }
 
-    public function component(string $component, array $componentParameters): self
+    public function component(string $component, array $componentParameters = []): self
     {
         $this->filter_type = 'component';
         $this->component = $component;
