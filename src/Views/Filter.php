@@ -61,11 +61,19 @@ class Filter
         return $this;
     }
 
+    /**
+     * Set the placeholder text for the filter input (applicable for text filters).
+     */
+
     public function placeholder(string $values): self
     {
         $this->placeholder = $values;
         return $this;
     }
+
+    /**
+     * Set the response time for the filter (used for debouncing).
+     */
 
     public function responseTime(string $values): self
     {
@@ -73,17 +81,29 @@ class Filter
         return $this;
     }
 
+    /**
+     * Set custom CSS classes for the filter input.
+     */
+
     public function customClass(string $values): self
     {
         $this->customClass = $values;
         return $this;
     }
 
+    /**
+     * Set the filter type to 'text' for a simple text input.
+     */
+
     public function text(): self
     {
         $this->filter_type = 'text';
         return $this;
     }
+
+    /**
+     * Set the filter type to 'select' and provide options for a dropdown.
+     */
 
     public function select(array $options = []): self
     {
@@ -95,9 +115,25 @@ class Filter
         return $this;
     }
 
+    /**
+     * Set the filter type to 'component' and specify the component to be used for this filter.
+     */
+
     public function component(string $component, array $componentParameters = []): self
     {
         $this->filter_type = 'component';
+        $this->component = $component;
+        $this->componentParameters = $componentParameters;
+        return $this;
+    }
+
+    /**
+     * Set the filter type to 'blade_component' and specify the blade component to be used for this filter.
+     */
+
+    public function bladeComponent(string $component, array $componentParameters = []): self
+    {
+        $this->filter_type = 'blade_component';
         $this->component = $component;
         $this->componentParameters = $componentParameters;
         return $this;

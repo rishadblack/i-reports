@@ -83,14 +83,14 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h1 class="modal-title fs-5" id="filterModalLabel">Filter</h1>
+                    <h5 class="modal-title" id="filterModalLabel">Filter</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     @foreach ($filter_list as $filter)
                         @if ($filter['filter_type'] == 'select')
                             <div class="{{ isset($filter['class']) ? $filter['class'] : 'col-lg-12' }}">
-                                <label for="{{ $filter['name'] }}">{{ $filter['title'] }}</label>
+                                <label for="{{ $filter['name'] }}" class="form-label">{{ $filter['title'] }}</label>
                                 <select wire:model="filters.{{ $filter['name'] }}" class="form-select">
                                     <option value="">Select {{ $filter['title'] }}</option>
                                     @foreach ($filter['options'] as $optionKey => $optionValue)
@@ -100,7 +100,7 @@
                             </div>
                         @elseif($filter['filter_type'] == 'text')
                             <div class="{{ isset($filter['class']) ? $filter['class'] : 'col-lg-12' }}">
-                                <label for="{{ $filter['name'] }}">{{ $filter['title'] }}</label>
+                                <label for="{{ $filter['name'] }}" class="form-label">{{ $filter['title'] }}</label>
                                 <input wire:model="filters.{{ $filter['name'] }}" class="form-control"
                                     placeholder="{{ $filter['placeholder'] }}" />
                             </div>
@@ -118,6 +118,17 @@
                                     ] + $filter['component_parameters'],
                                     key('filter-' . $filter['name'] . '-' . $loop->index)
                                 )
+                            </div>
+                        @elseif($filter['filter_type'] == 'blade_component')
+                            @php
+                                $componentParams = $filter['component_parameters'] ?? [];
+                            @endphp
+
+                            <div class="{{ $filter['class'] ?? 'col-lg-12' }}"
+                                wire:key="filter-{{ $filter['name'] }}-wrapper-{{ $loop->index }}">
+                                <x-dynamic-component :component="$filter['component']" :key="'filter-' . $filter['name'] . '-item-' . $loop->index"
+                                    wire:model="filters.{{ $filter['name'] }}" :name="'filters.' . $filter['name']" :label="$filter['title']"
+                                    :placeholder="$filter['placeholder']" :options="$componentParams['options'] ?? null" :datalist="$componentParams['datalist'] ?? null" :params="$componentParams" />
                             </div>
                         @endif
                     @endforeach

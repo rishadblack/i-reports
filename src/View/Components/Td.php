@@ -59,11 +59,6 @@ class Td extends BaseComponent
             return '';
         }
 
-        // If custom passed, only render when it matches
-        if ($this->custom && $this->custom !== $this->name) {
-            return '';
-        }
-
         if ($this->column && $this->row) {
             $this->value = $this->column->applyFormat($this->column->getValue($this->row), $this->row, $this->column);
         }

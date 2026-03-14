@@ -53,11 +53,6 @@ class Th extends BaseComponent
             return '';
         }
 
-        // If custom passed, only render when it matches
-        if ($this->custom && $this->custom !== $this->name) {
-            return '';
-        }
-
         $columnStyle = null;
         if ($this->column) {
             $columnStyle = $this->column->applyStyle($this->row ?? null);
