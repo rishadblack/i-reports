@@ -157,7 +157,9 @@ trait Helpers
 
     public function getFilter(string $filterName): string | bool
     {
-        return isset($this->filters[$filterName]) ? $this->filters[$filterName] : false;
+        $filters = ReportHelper::getFilters();
+
+        return isset($filters[$filterName]) ? $filters[$filterName] : false;
     }
 
     public function setDefaultSort(string $field, string $direction = 'asc')
