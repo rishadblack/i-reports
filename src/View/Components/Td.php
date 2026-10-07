@@ -1,22 +1,28 @@
 <?php
+
 namespace Rishadblack\IReports\View\Components;
 
 use Illuminate\Database\Eloquent\Model;
 use Rishadblack\IReports\Helpers\ReportHelper;
 use Rishadblack\IReports\Traits\StyleMergerTrait;
 use Rishadblack\IReports\Views\Column;
-use Rishadblack\IReports\View\Components\BaseComponent;
 
 class Td extends BaseComponent
 {
     use StyleMergerTrait;
 
     public ?string $name;
+
     public ?Column $column;
+
     public ?Model $row;
+
     public ?string $style;
+
     public mixed $value = null;
+
     public ?string $custom;
+
     public ?string $skip;
 
     protected static array $renderedColumns = [];

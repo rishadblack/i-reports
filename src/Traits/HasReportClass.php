@@ -1,4 +1,5 @@
 <?php
+
 namespace Rishadblack\IReports\Traits;
 
 use Illuminate\Support\Str;
@@ -16,7 +17,7 @@ trait HasReportClass
 
         if ($reportNamespaceSegment) {
             // Ensure the report namespace segment ends with a backslash
-            $reportNamespaceSegment = rtrim($reportNamespaceSegment, '\\') . '\\';
+            $reportNamespaceSegment = rtrim($reportNamespaceSegment, '\\').'\\';
         }
 
         // Module format: module::report.path-name
@@ -32,11 +33,11 @@ trait HasReportClass
 
             // Convert dot notation to PSR-4 class path
             $reportClassPath = collect(explode('.', $reportPath))
-                ->map(fn($segment) => Str::studly($segment))
+                ->map(fn ($segment) => Str::studly($segment))
                 ->implode('\\');
 
             // Build final class path
-            $class = "{$moduleNamespace}\\" . Str::studly($moduleName) . "\\{$moduleLivewireNamespace}\\{$reportNamespaceSegment}{$reportClassPath}{$suffix}";
+            $class = "{$moduleNamespace}\\".Str::studly($moduleName)."\\{$moduleLivewireNamespace}\\{$reportNamespaceSegment}{$reportClassPath}{$suffix}";
 
             if (class_exists($class)) {
                 return $class;
@@ -51,7 +52,7 @@ trait HasReportClass
         }
 
         $reportClassPath = collect(explode('.', $report))
-            ->map(fn($segment) => Str::studly($segment))
+            ->map(fn ($segment) => Str::studly($segment))
             ->implode('\\');
 
         $class = "{$livewireNamespace}\\{$reportNamespaceSegment}{$reportClassPath}{$suffix}";
@@ -62,5 +63,4 @@ trait HasReportClass
 
         throw new \Exception("Report class not found: {$class}");
     }
-
 }

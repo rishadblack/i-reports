@@ -1,4 +1,5 @@
 <?php
+
 namespace Rishadblack\IReports\Http\Controllers;
 
 use Illuminate\Http\Request;
@@ -43,7 +44,6 @@ class ReportViewController
 
         if (! $reportInstance) {
             throw new \Exception("Report class not found: {$controllerClass}");
-
         }
 
         ReportHelper::setColumns($reportInstance->columns());

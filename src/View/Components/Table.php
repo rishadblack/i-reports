@@ -1,12 +1,13 @@
 <?php
+
 namespace Rishadblack\IReports\View\Components;
 
 use Rishadblack\IReports\Helpers\ReportHelper;
-use Rishadblack\IReports\View\Components\BaseComponent;
 
 class Table extends BaseComponent
 {
     public $type;
+
     public $style;
 
     public function __construct(?string $type = 'table', ?string $style = null)
@@ -25,6 +26,7 @@ class Table extends BaseComponent
             }
 
         }
+
         return view('i-reports::components.table');
     }
 }

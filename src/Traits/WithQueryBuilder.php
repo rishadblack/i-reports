@@ -1,11 +1,11 @@
 <?php
+
 namespace Rishadblack\IReports\Traits;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
-use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Arr;
 use Rishadblack\IReports\Helpers\ReportHelper;
@@ -22,6 +22,7 @@ trait WithQueryBuilder
     public function setPrimaryKey(string $primaryKey)
     {
         $this->primaryKey = $primaryKey;
+
         return $this;
     }
 
@@ -30,7 +31,7 @@ trait WithQueryBuilder
         $this->builder = $builder;
     }
 
-    public function setAdditionalSelects(string | array $selects): self
+    public function setAdditionalSelects(string|array $selects): self
     {
         if (! is_array($selects)) {
             $selects = [$selects];
@@ -94,8 +95,8 @@ trait WithQueryBuilder
 
         // Get searchable column names from columns()
         $searchableColumns = collect($this->columns())
-            ->filter(fn($column) => $column->isSearchable())
-            ->map(fn($column) => $column->getColumnSelectName())
+            ->filter(fn ($column) => $column->isSearchable())
+            ->map(fn ($column) => $column->getColumnSelectName())
             ->all();
 
         // Merge with $this->getSearchField() (which may return extra fields)
@@ -105,6 +106,7 @@ trait WithQueryBuilder
             if (count($fields) > 0) {
                 $this->applySearchable($this->getBuilder(), $fields, $search);
             }
+
             return $this->search($this->getBuilder(), $search);
             // return $this->getBuilder(), $search;
         }
@@ -116,6 +118,12 @@ trait WithQueryBuilder
     {
         $sortField = ReportHelper::getSortField();
         $sortDirection = ReportHelper::getSortDirection();
+
+        // Fall back to the default sort set with setDefaultSort()
+        if (! $sortField) {
+            [$sortField, $sortDirection] = $this->getDefaultSortField();
+            $sortDirection = strtolower($sortDirection ?? 'asc');
+        }
 
         $allowedDirections = ['asc', 'desc'];
         if (! in_array($sortDirection, $allowedDirections)) {
@@ -137,7 +145,7 @@ trait WithQueryBuilder
         }
 
         foreach ($this->getSelectedColumnsForQuery() as $column) {
-            $this->setBuilder($this->getBuilder()->addSelect($column->getColumn() . ' as ' . $column->getColumnSelectName()));
+            $this->setBuilder($this->getBuilder()->addSelect($column->getColumn().' as '.$column->getColumnSelectName()));
         }
 
         return $this->getBuilder();
@@ -150,6 +158,7 @@ trait WithQueryBuilder
                 $this->setBuilder($this->joinRelation($column));
             }
         }
+
         return $this->getBuilder();
     }
 
@@ -175,7 +184,7 @@ trait WithQueryBuilder
                     $foreign = "$tableAlias.{$model->getForeignKeyName()}";
                     $other = $i === 0
                     ? $model->getQualifiedParentKeyName()
-                    : $lastAlias . '.' . $model->getLocalKeyName();
+                    : $lastAlias.'.'.$model->getLocalKeyName();
 
                     break;
 
@@ -183,7 +192,7 @@ trait WithQueryBuilder
                     $table = "{$model->getRelated()->getTable()} AS $tableAlias";
                     $foreign = $i === 0
                     ? $model->getQualifiedForeignKeyName()
-                    : $lastAlias . '.' . $model->getForeignKeyName();
+                    : $lastAlias.'.'.$model->getForeignKeyName();
 
                     $other = "$tableAlias.{$model->getOwnerKeyName()}";
 
@@ -289,6 +298,7 @@ trait WithQueryBuilder
 
             $lastQuery = $model->getQuery();
         }
+
         return $table;
     }
 
@@ -298,6 +308,6 @@ trait WithQueryBuilder
             return $relationPart;
         }
 
-        return $currentTableAlias . '_' . $relationPart;
+        return $currentTableAlias.'_'.$relationPart;
     }
 }

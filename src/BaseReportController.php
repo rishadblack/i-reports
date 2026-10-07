@@ -1,4 +1,5 @@
 <?php
+
 namespace Rishadblack\IReports;
 
 use Illuminate\Database\Eloquent\Builder;
@@ -12,7 +13,7 @@ use Rishadblack\IReports\Traits\WithQueryBuilder;
 
 abstract class BaseReportController extends Controller
 {
-    use WithQueryBuilder, WithExcel, WithMpdfPdf, Helpers;
+    use Helpers, WithExcel, WithMpdfPdf, WithQueryBuilder;
 
     public function __construct()
     {
@@ -20,7 +21,9 @@ abstract class BaseReportController extends Controller
     }
 
     abstract public function builder(): Builder;
+
     abstract public function configure(): void;
+
     abstract public function columns(): array;
 
     public function additionalData(): array

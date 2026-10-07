@@ -1,4 +1,5 @@
 <?php
+
 namespace Rishadblack\IReports\Helpers;
 
 use Rishadblack\IReports\Services\ReportTokenManager;
@@ -6,10 +7,15 @@ use Rishadblack\IReports\Services\ReportTokenManager;
 class RequestHelper
 {
     protected array $filters = [];
+
     protected string $search = '';
+
     protected string $export = '';
-    protected int $perPage   = 25;
-    protected int $page      = 1;
+
+    protected int $perPage = 25;
+
+    protected int $page = 1;
+
     protected string $report = '';
 
     public function __construct(array $params = [])
@@ -24,31 +30,77 @@ class RequestHelper
 
     // Setters for fluent usage if needed
     public function setFilters(array $filters): self
-    {$this->filters = $filters;return $this;}
+    {
+        $this->filters = $filters;
+
+        return $this;
+    }
+
     public function setSearch(string $search): self
-    {$this->search = $search;return $this;}
+    {
+        $this->search = $search;
+
+        return $this;
+    }
+
     public function setExport(string $export): self
-    {$this->export = $export;return $this;}
+    {
+        $this->export = $export;
+
+        return $this;
+    }
+
     public function setPerPage(int $perPage): self
-    {$this->perPage = $perPage;return $this;}
+    {
+        $this->perPage = $perPage;
+
+        return $this;
+    }
+
     public function setPage(int $page): self
-    {$this->page = $page;return $this;}
+    {
+        $this->page = $page;
+
+        return $this;
+    }
+
     public function setReport(string $report): self
-    {$this->report = $report;return $this;}
+    {
+        $this->report = $report;
+
+        return $this;
+    }
 
     // Getters
     public function getFilters(): array
-    {return $this->filters;}
+    {
+        return $this->filters;
+    }
+
     public function getSearch(): string
-    {return $this->search;}
+    {
+        return $this->search;
+    }
+
     public function getExport(): string
-    {return $this->export;}
+    {
+        return $this->export;
+    }
+
     public function getPerPage(): int
-    {return $this->perPage;}
+    {
+        return $this->perPage;
+    }
+
     public function getPage(): int
-    {return $this->page;}
+    {
+        return $this->page;
+    }
+
     public function getReport(): string
-    {return $this->report;}
+    {
+        return $this->report;
+    }
 
     // Compose all request data for token or query building
     public function toArray(): array

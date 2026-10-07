@@ -1,4 +1,5 @@
 <?php
+
 namespace Rishadblack\IReports\Http\Livewire;
 
 use Livewire\Component;
@@ -11,7 +12,9 @@ class ReportViewer extends Component
     use HasReportClass, WithPagination, WithReportViewer;
 
     public $report;
+
     public $filter_list = [];
+
     public $filter_extended_view;
 
     protected $queryString = ['filters', 'search', 'per_page', 'page'];
@@ -21,7 +24,7 @@ class ReportViewer extends Component
         return [
             'search' => 'nullable|string|max:255',
             'export' => 'nullable|in:print,xlsx,csv,pdf',
-            'page' => 'nullable|integer|min:1|max:' . $this->last_page,
+            'page' => 'nullable|integer|min:1|max:'.$this->last_page,
             'per_page' => 'nullable|integer|min:1|max:100',
         ];
     }
@@ -33,7 +36,7 @@ class ReportViewer extends Component
         $this->per_page = $this->per_page ?? $reportInstance->getPagination();
         $this->per_page_list = $reportInstance->getPaginationList();
         $this->filter_list = collect($reportInstance->filters())
-            ->map(fn($filter) => $filter->toArray())
+            ->map(fn ($filter) => $filter->toArray())
             ->all();
     }
 

@@ -1,4 +1,5 @@
 <?php
+
 namespace Rishadblack\IReports\Traits;
 
 use Illuminate\Support\Collection;
@@ -11,26 +12,38 @@ use Rishadblack\IReports\Views\Column;
 trait Helpers
 {
     protected $header_title;
+
     protected $report_title;
+
     protected $file_name;
+
     protected $file_title;
+
     protected $header_view;
+
     protected $pagination;
+
     protected $pagination_list = [];
+
     protected $paper_size;
+
     protected $orientation;
+
     protected $default_sort_field;
+
     protected $default_sort_direction;
+
     protected $search_field;
 
     public function setHeaderView(string $header_view)
     {
         // $this->header_view = $header_view;
         Config::set('i-reports.header_view', $header_view);
+
         return $this;
     }
 
-    public function getHeaderView(): string | null
+    public function getHeaderView(): ?string
     {
         // return $this->header_view;
         return Config::get('i-reports.header_view', null);
@@ -39,6 +52,7 @@ trait Helpers
     public function setHeaderTitle(string $headerTitle)
     {
         $this->header_title = $headerTitle;
+
         return $this;
     }
 
@@ -50,19 +64,21 @@ trait Helpers
     public function setReportTitle(string $reportTitle)
     {
         $this->report_title = $reportTitle;
+
         return $this;
     }
 
     protected function setupColumns(): Collection
     {
         return collect($this->columns())
-            ->filter(fn($column) => $column instanceof Column)
+            ->filter(fn ($column) => $column instanceof Column)
             ->map(function (Column $column) {
                 if ($column->isBaseColumn()) {
                     $column->setTable($this->getBuilder()->getModel()->getTable());
                 } else {
                     $column->setTable($this->getTableForColumn($column));
                 }
+
                 return $column;
             });
 
@@ -83,6 +99,7 @@ trait Helpers
     public function setFileName(string $fileName)
     {
         $this->file_name = $fileName;
+
         return $this;
     }
 
@@ -103,6 +120,7 @@ trait Helpers
     public function setFileTitle(string $fileTitle)
     {
         $this->file_title = $fileTitle;
+
         return $this;
     }
 
@@ -114,6 +132,7 @@ trait Helpers
     public function setPagination(int $pagination)
     {
         $this->pagination = $pagination;
+
         return $this;
     }
 
@@ -125,6 +144,7 @@ trait Helpers
     public function setPaginationList(array $paginationList)
     {
         $this->pagination_list = $paginationList;
+
         return $this;
     }
 
@@ -136,6 +156,7 @@ trait Helpers
     public function setPaperSize(string $paperSize)
     {
         $this->paper_size = $paperSize;
+
         return $this;
     }
 
@@ -147,6 +168,7 @@ trait Helpers
     public function setOrientation(string $orientation)
     {
         $this->orientation = $orientation;
+
         return $this;
     }
 
@@ -155,7 +177,7 @@ trait Helpers
         return $this->orientation ?? config('i-reports.pdf_orientation');
     }
 
-    public function getFilter(string $filterName): string | bool
+    public function getFilter(string $filterName): string|bool
     {
         $filters = ReportHelper::getFilters();
 
@@ -166,6 +188,7 @@ trait Helpers
     {
         $this->default_sort_field = $field;
         $this->default_sort_direction = $direction;
+
         return $this;
     }
 
@@ -174,7 +197,7 @@ trait Helpers
         return [$this->default_sort_field, $this->default_sort_direction];
     }
 
-    public function setSearchField(array | string $SearchField)
+    public function setSearchField(array|string $SearchField)
     {
         if (is_string($SearchField)) {
             $SearchField = [$SearchField];
@@ -193,8 +216,8 @@ trait Helpers
     public function getSelectedColumnsForQuery(): Collection
     {
         return $this->getColumns()
-            ->reject(fn(Column $column) => $column->isHidden())
-            ->reject(fn(Column $column) => $column->isCustom());
+            ->reject(fn (Column $column) => $column->isHidden())
+            ->reject(fn (Column $column) => $column->isCustom());
     }
 
     public function getViewName(): string
@@ -220,9 +243,9 @@ trait Helpers
 
             // Remove the last class name and convert it to kebab-case
             $componentParts = collect($subPathParts)
-                ->map(fn($part) => Str::kebab($part));
+                ->map(fn ($part) => Str::kebab($part));
 
-            return strtolower($moduleName) . '::' . $componentParts->implode('.');
+            return strtolower($moduleName).'::'.$componentParts->implode('.');
         }
 
         $livewireNamespaceParts = explode('\\', $livewireNamespace);
@@ -236,7 +259,7 @@ trait Helpers
             $subPathParts = array_slice($namespaceParts, $appLivewireIndex); // ['Livewire', 'Reports', 'UsersReport']
 
             $componentParts = collect($subPathParts)
-                ->map(fn($part) => Str::kebab($part));
+                ->map(fn ($part) => Str::kebab($part));
 
             return $componentParts->implode('.');
         }
@@ -293,5 +316,4 @@ trait Helpers
 
         return $this->renderReport($this->getViewName(), $data);
     }
-
 }

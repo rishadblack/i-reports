@@ -1,4 +1,5 @@
 <?php
+
 namespace Rishadblack\IReports\Exports;
 
 use Illuminate\Contracts\View\View;
@@ -10,6 +11,7 @@ use Maatwebsite\Excel\Events\AfterSheet;
 class ReportExport implements FromView, ShouldAutoSize, WithEvents
 {
     public string $currentView;
+
     public array $currentData = [];
 
     public function view(): View
@@ -20,12 +22,14 @@ class ReportExport implements FromView, ShouldAutoSize, WithEvents
     public function setCurrentView($currentView)
     {
         $this->currentView = $currentView;
+
         return $this;
     }
 
     public function setCurrentData($currentData)
     {
         $this->currentData = $currentData;
+
         return $this;
     }
 

@@ -1,4 +1,5 @@
 <?php
+
 namespace Rishadblack\IReports\View\Components;
 
 use Illuminate\View\Component;

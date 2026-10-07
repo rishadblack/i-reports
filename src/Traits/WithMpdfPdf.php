@@ -1,42 +1,54 @@
 <?php
+
 namespace Rishadblack\IReports\Traits;
 
-use Mccarlosen\LaravelMpdf\Facades\LaravelMpdf;
+use Illuminate\Http\Response;
+use Mpdf\Mpdf;
+use Mpdf\Output\Destination;
 
 trait WithMpdfPdf
 {
-    public function pdfExportByMpdf(string $view, array $data = [])
+    public function pdfExportByMpdf(string $view, array $data = []): Response
     {
         // Load config
-        $mpdfConfig = config('i-reports.mpdf');
+        $mpdfConfig = config('i-reports.mpdf', []);
         $headerConfig = config('i-reports.pdf_header');
         $footerConfig = config('i-reports.pdf_footer');
 
         // Set paper and orientation
         $options = array_merge([
-            'title' => $this->getFileTitle(),
+            'mode' => 'utf-8',
             'format' => $this->getPaperSize(),
             'orientation' => $this->getOrientation() === 'landscape' ? 'L' : 'P',
+            'tempDir' => storage_path('app/i-reports/mpdf'),
+            'autoScriptToLang' => true,
+            'autoLangToFont' => true,
         ], $mpdfConfig);
 
         // Create PDF instance
-        $pdf = LaravelMpdf::loadView($view, $data, [], $options);
+        $mpdf = new Mpdf($options);
+        $mpdf->SetTitle($this->getFileTitle());
 
         // Header (text or blade)
         // if ($headerConfig['html_view']) {
-        //     $pdf->getMpdf()->SetHTMLHeader(view($headerConfig['html_view'], $data)->render());
+        //     $mpdf->SetHTMLHeader(view($headerConfig['html_view'], $data)->render());
         // } else {
-        //     $pdf->getMpdf()->SetHTMLHeader($this->buildHeaderFooterTable($headerConfig));
+        //     $mpdf->SetHTMLHeader($this->buildHeaderFooterTable($headerConfig));
         // }
 
         // // Footer (text or blade)
         // if ($footerConfig['html_view']) {
-        //     $pdf->getMpdf()->SetHTMLFooter(view($footerConfig['html_view'], $data)->render());
+        //     $mpdf->SetHTMLFooter(view($footerConfig['html_view'], $data)->render());
         // } else {
-        //     $pdf->getMpdf()->SetHTMLFooter($this->buildHeaderFooterTable($footerConfig));
+        //     $mpdf->SetHTMLFooter($this->buildHeaderFooterTable($footerConfig));
         // }
 
-        return $pdf->download($this->getFileName() . '.pdf');
+        $mpdf->WriteHTML(view($view, $data)->render());
+
+        return new Response($mpdf->Output('', Destination::STRING_RETURN), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$this->getFileName().'.pdf"',
+        ]);
     }
 
     protected function buildHeaderFooterTable(array $config): string

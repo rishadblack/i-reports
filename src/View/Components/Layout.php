@@ -1,7 +1,6 @@
 <?php
-namespace Rishadblack\IReports\View\Components;
 
-use Rishadblack\IReports\View\Components\BaseComponent;
+namespace Rishadblack\IReports\View\Components;
 
 class Layout extends BaseComponent
 {

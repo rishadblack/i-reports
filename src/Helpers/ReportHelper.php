@@ -1,4 +1,5 @@
 <?php
+
 namespace Rishadblack\IReports\Helpers;
 
 use Rishadblack\IReports\Views\Column;
@@ -6,8 +7,11 @@ use Rishadblack\IReports\Views\Column;
 class ReportHelper
 {
     protected static $requestData = null;
-    protected static $columns     = [];
+
+    protected static $columns = [];
+
     protected static $report_title;
+
     protected static $header_title;
 
     public static function setRequestData(array $value): void
@@ -32,6 +36,7 @@ class ReportHelper
                 return $column;
             }
         }
+
         return null;
     }
 
@@ -88,6 +93,7 @@ class ReportHelper
     public static function getSearch(): string
     {
         $search = self::$requestData['search'] ?? '';
+
         return is_string($search) ? trim($search) : '';
     }
 
@@ -99,6 +105,7 @@ class ReportHelper
     public static function getSortDirection(): string
     {
         $direction = strtolower(self::$requestData['sort_direction'] ?? 'asc');
+
         return in_array($direction, ['asc', 'desc']) ? $direction : 'asc';
     }
 }

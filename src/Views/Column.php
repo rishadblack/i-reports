@@ -1,4 +1,5 @@
 <?php
+
 namespace Rishadblack\IReports\Views;
 
 use Illuminate\Contracts\Support\Arrayable;
@@ -9,17 +10,29 @@ use Illuminate\Support\Str;
 class Column implements Arrayable
 {
     protected string $title;
+
     protected string $name;
+
     protected string $field;
+
     protected string $table;
+
     protected bool $custom = false;
+
     protected $style;
+
     protected bool $searchable = false;
-    protected bool $sortable   = false;
-    protected bool $isHidden   = false;
-    protected array $hideIn    = [];
+
+    protected bool $sortable = false;
+
+    protected bool $isHidden = false;
+
+    protected array $hideIn = [];
+
     protected $format;
-    protected array $relations         = [];
+
+    protected array $relations = [];
+
     protected bool $eagerLoadRelations = false;
 
     public function __construct(string $title, string $name)
@@ -51,6 +64,7 @@ class Column implements Arrayable
     public function searchable(): self
     {
         $this->searchable = true;
+
         return $this;
     }
 
@@ -74,17 +88,18 @@ class Column implements Arrayable
         return $this->field;
     }
 
-    public function style(string | callable $style): self
+    public function style(string|callable $style): self
     {
         if (! is_string($style) && ! is_callable($style)) {
             throw new \InvalidArgumentException('Style must be a string or callable');
         }
 
         $this->style = $style;
+
         return $this;
     }
 
-    public function getStyle(): string | callable | null
+    public function getStyle(): string|callable|null
     {
         return $this->style;
     }
@@ -94,21 +109,23 @@ class Column implements Arrayable
         if (is_callable($this->style)) {
             return call_user_func($this->style, $row);
         }
+
         return $this->style;
     }
 
     public function format(callable $format): self
     {
         $this->format = $format;
+
         return $this;
     }
 
-    public function getFormat():  ? callable
+    public function getFormat(): ?callable
     {
         return $this->format;
     }
 
-    public function applyFormat($value, $row, $column) : mixed
+    public function applyFormat($value, $row, $column): mixed
     {
         if (is_callable($this->format)) {
             return call_user_func($this->format, $value, $row, $column);
@@ -120,6 +137,7 @@ class Column implements Arrayable
     public function sortable(): self
     {
         $this->sortable = true;
+
         return $this;
     }
 
@@ -131,12 +149,14 @@ class Column implements Arrayable
     public function hide(): self
     {
         $this->isHidden = true;
+
         return $this;
     }
 
     public function hideIn(string $hideIn): self
     {
         $this->hideIn = explode('|', $hideIn);
+
         return $this;
     }
 
@@ -148,6 +168,7 @@ class Column implements Arrayable
     public function custom(): self
     {
         $this->custom = true;
+
         return $this;
     }
 
@@ -194,7 +215,7 @@ class Column implements Arrayable
 
     public function getColumn(): ?string
     {
-        return $this->getTable() . '.' . $this->getField();
+        return $this->getTable().'.'.$this->getField();
     }
 
     public function getColumnSelectName(): ?string
@@ -203,7 +224,7 @@ class Column implements Arrayable
             return $this->getField();
         }
 
-        return $this->getRelationString() . '.' . $this->getField();
+        return $this->getRelationString().'.'.$this->getField();
     }
 
     public function getValue(Model $row): mixed
@@ -212,7 +233,7 @@ class Column implements Arrayable
             return $row->{$this->getField()};
         }
 
-        return $row->{$this->getRelationString() . '.' . $this->getField()};
+        return $row->{$this->getRelationString().'.'.$this->getField()};
     }
 
     public function toArray(): array

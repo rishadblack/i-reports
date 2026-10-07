@@ -1,4 +1,5 @@
 <?php
+
 namespace Rishadblack\IReports\Traits;
 
 use Livewire\Attributes\Computed;
@@ -7,14 +8,22 @@ use Rishadblack\IReports\Helpers\RequestHelper;
 trait WithReportViewer
 {
     public $filters = [];
-    public $export  = '';
+
+    public $export = '';
+
     public $per_page;
+
     public $per_page_list = [];
-    public $page          = 1;
-    public $last_page     = 1;
-    public $current_page  = 1;
-    public $total         = 0;
-    public $search        = '';
+
+    public $page = 1;
+
+    public $last_page = 1;
+
+    public $current_page = 1;
+
+    public $total = 0;
+
+    public $search = '';
 
     public string $orientation = 'fullpage';
 

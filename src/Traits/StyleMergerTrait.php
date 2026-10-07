@@ -1,9 +1,9 @@
 <?php
+
 namespace Rishadblack\IReports\Traits;
 
 trait StyleMergerTrait
 {
-
     protected function parseStyleString(string $style): array
     {
         $rules = [];
@@ -17,6 +17,7 @@ trait StyleMergerTrait
                 $rules[$key] = $value;
             }
         }
+
         return $rules;
     }
 
@@ -26,7 +27,8 @@ trait StyleMergerTrait
         foreach ($rules as $key => $value) {
             $parts[] = "$key: $value";
         }
-        return implode('; ', $parts) . ';';
+
+        return implode('; ', $parts).';';
     }
 
     protected function mergeStyles(?string $baseStyle, ?string $overrideStyle): string

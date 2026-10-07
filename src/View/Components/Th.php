@@ -1,19 +1,23 @@
 <?php
+
 namespace Rishadblack\IReports\View\Components;
 
 use Rishadblack\IReports\Helpers\ReportHelper;
 use Rishadblack\IReports\Traits\StyleMergerTrait;
 use Rishadblack\IReports\Views\Column;
-use Rishadblack\IReports\View\Components\BaseComponent;
 
 class Th extends BaseComponent
 {
     use StyleMergerTrait;
 
     public ?string $name;
+
     public ?Column $column;
+
     public ?string $style;
+
     public ?string $skip;
+
     public ?string $custom;
 
     protected static array $renderedColumns = [];

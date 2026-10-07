@@ -1,4 +1,5 @@
 <?php
+
 namespace Rishadblack\IReports\Services;
 
 use Illuminate\Support\Carbon;
@@ -20,13 +21,15 @@ class ReportTokenManager
         if (Config::get('i-reports.use_cache_token') && self::supportsTags()) {
             $token = Str::random(32);
             Cache::put("ireport_token:$token", $data, now()->addMinutes($ttlMinutes));
+
             return "c:$token"; // c: = cache-based token
         }
 
         // Else: encrypt
         $json = json_encode($data);
         $encrypted = Crypt::encryptString($json);
-        return "e:" . base64_encode($encrypted); // e: = encrypted token
+
+        return 'e:'.base64_encode($encrypted); // e: = encrypted token
     }
 
     /**
