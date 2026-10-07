@@ -160,13 +160,21 @@ it('renders rows for every visible column without per-cell components', function
 it('raises the memory limit for full exports only', function () {
     seedCustomers();
     config()->set('i-reports.export_memory_limit', '2048M');
-    $before = ini_get('memory_limit');
+    $original = ini_get('memory_limit');
+    ini_set('memory_limit', '512M');
 
-    $this->get(reportUrl())->assertOk();
-    expect(ini_get('memory_limit'))->toBe($before);
+    try {
+        $this->get(reportUrl())->assertOk();
+        expect(ini_get('memory_limit'))->toBe('512M');
 
-    $this->get(reportUrl(['export' => 'print']))->assertOk();
-    expect(ini_get('memory_limit'))->toBe('2048M');
+        $this->get(reportUrl(['export' => 'print']))->assertOk();
+        expect(ini_get('memory_limit'))->toBe('2048M');
 
-    ini_set('memory_limit', $before);
+        // Unlimited stays unlimited.
+        ini_set('memory_limit', '-1');
+        $this->get(reportUrl(['export' => 'print']))->assertOk();
+        expect(ini_get('memory_limit'))->toBe('-1');
+    } finally {
+        ini_set('memory_limit', (string) $original);
+    }
 });

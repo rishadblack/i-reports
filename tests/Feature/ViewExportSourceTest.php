@@ -10,6 +10,7 @@ use Rishadblack\IReports\Http\Livewire\ReportViewer;
 use Rishadblack\IReports\Services\ReportResolver;
 use Rishadblack\IReports\Support\ReportContext;
 use Rishadblack\IReports\Views\Column;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 beforeEach(function () {
     seedCustomers();
@@ -30,7 +31,10 @@ function ledgerReport(array $params = []): BaseReportController
 }
 
 it('exports csv from the report view with values computed in blade', function () {
-    $content = $this->get(reportUrl(['export' => 'csv'], 'ledger'))->assertOk()->streamedContent();
+    $response = $this->get(reportUrl(['export' => 'csv'], 'ledger'))->assertOk();
+    $content = $response->baseResponse instanceof BinaryFileResponse
+        ? (string) file_get_contents($response->baseResponse->getFile()->getPathname())
+        : $response->streamedContent();
 
     expect($content)->toContain('RB 250.50')
         ->and($content)->toContain('RB 425.50')

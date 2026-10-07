@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\Reports\CustomersReport;
+use Composer\InstalledVersions;
 use Livewire\Livewire;
 use Rishadblack\IReports\Facades\IReports;
 use Rishadblack\IReports\Http\Livewire\ReportViewer;
@@ -10,13 +11,29 @@ beforeEach(function () {
     seedCustomers();
 });
 
+/**
+ * The directive the package writes for a mode on the installed Livewire version
+ * (Livewire 4: .live.change / .live.blur; Livewire 3: .lazy / .blur).
+ */
+function expectedModel(string $mode): string
+{
+    $livewire4 = (int) InstalledVersions::getVersion('livewire/livewire') >= 4;
+
+    return match ($mode) {
+        'change' => $livewire4 ? 'wire:model.live.change' : 'wire:model.lazy',
+        'blur' => $livewire4 ? 'wire:model.live.blur' : 'wire:model.blur',
+    };
+}
+
 it('builds the wire:model directive for each update mode', function (Filter $filter, string $directive) {
+    $directive = in_array($directive, ['change', 'blur'], true) ? expectedModel($directive) : $directive;
+
     expect($filter->wireModel())->toBe($directive)
         ->and($filter->toArray()['wire_model'])->toBe($directive);
 })->with([
     'default waits for apply' => [Filter::make('A', 'a')->text(), 'wire:model'],
-    'on change' => [Filter::make('A', 'a')->select()->onChange(), 'wire:model.live.change'],
-    'on blur' => [Filter::make('A', 'a')->text()->onBlur(), 'wire:model.live.blur'],
+    'on change' => [Filter::make('A', 'a')->select()->onChange(), 'change'],
+    'on blur' => [Filter::make('A', 'a')->text()->onBlur(), 'blur'],
     'live with debounce' => [Filter::make('A', 'a')->text()->live(300), 'wire:model.live.debounce.300ms'],
     'live with the default debounce' => [Filter::make('A', 'a')->text()->live(), 'wire:model.live.debounce.500ms'],
     'live without debounce' => [Filter::make('A', 'a')->text()->live(0), 'wire:model.live'],
@@ -28,7 +45,7 @@ it('takes the default mode and debounce from config', function () {
     config()->set('i-reports.filter_debounce', 800);
 
     expect(Filter::make('A', 'a')->text()->wireModel())->toBe('wire:model.live.debounce.800ms')
-        ->and(Filter::make('A', 'a')->text()->onChange()->wireModel())->toBe('wire:model.live.change')
+        ->and(Filter::make('A', 'a')->text()->onChange()->wireModel())->toBe(expectedModel('change'))
         ->and(Filter::make('A', 'a')->text()->deferred()->wireModel())->toBe('wire:model');
 
     config()->set('i-reports.filter_update', 'nonsense');
@@ -54,10 +71,10 @@ it('renders every filter field with its update mode', function () {
     IReports::register('modes', $report::class);
 
     Livewire::test(ReportViewer::class, ['report' => 'modes'])
-        ->assertSeeHtml('wire:model.live.change="filters.city"')
+        ->assertSeeHtml(expectedModel('change').'="filters.city"')
         ->assertSeeHtml('wire:model.live.debounce.300ms="filters.name"')
-        ->assertSeeHtml('wire:model.live.blur="filters.joined.from"')
-        ->assertSeeHtml('wire:model.live.blur="filters.joined.to"')
+        ->assertSeeHtml(expectedModel('blur').'="filters.joined.from"')
+        ->assertSeeHtml(expectedModel('blur').'="filters.joined.to"')
         ->assertSeeHtml('data-pick="filters.pick" wire:model.live.debounce.500ms="filters.pick"')
         ->assertSeeHtml('data-pick="filters.plain" wire:model="filters.plain"');
 });
