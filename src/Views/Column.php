@@ -43,9 +43,11 @@ class Column implements Arrayable
 
     protected bool $isHidden = false;
 
-    protected bool $hideable = true;
+    protected ?bool $hideable = null;
 
     protected bool $hiddenByDefault = false;
+
+    protected bool $alwaysSelect = false;
 
     /** @var array<int, string> */
     protected array $hideIn = [];
@@ -137,7 +139,8 @@ class Column implements Arrayable
     }
 
     /**
-     * Whether the user may show or hide the column from the viewer's column picker (default true).
+     * Whether the user may show or hide the column from the viewer's column picker
+     * (default: config('i-reports.columns_hideable'), true unless changed).
      */
     public function hideable(bool $hideable = true): static
     {
@@ -148,7 +151,7 @@ class Column implements Arrayable
 
     public function isHideable(): bool
     {
-        return $this->hideable && ! $this->isHidden;
+        return ($this->hideable ?? (bool) config('i-reports.columns_hideable', true)) && ! $this->isHidden;
     }
 
     /**
@@ -159,6 +162,22 @@ class Column implements Arrayable
         $this->hiddenByDefault = $hidden;
 
         return $this;
+    }
+
+    /**
+     * Keep the column in the SQL query even when it is hidden, because map(), another column's
+     * format() or a custom view reads its value.
+     */
+    public function alwaysSelect(bool $always = true): static
+    {
+        $this->alwaysSelect = $always;
+
+        return $this;
+    }
+
+    public function isAlwaysSelected(): bool
+    {
+        return $this->alwaysSelect;
     }
 
     public function isHiddenByDefault(): bool

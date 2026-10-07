@@ -65,6 +65,30 @@ class ReportContext
         return $this->requestData;
     }
 
+    /**
+     * The raw page setup the user chose in the export dialog (validated by PageSetup::resolve()).
+     *
+     * @return array<string, mixed>
+     */
+    public function getPageSetup(): array
+    {
+        $setup = $this->requestData['page_setup'] ?? [];
+
+        return is_array($setup) ? $setup : [];
+    }
+
+    /**
+     * A config('i-reports.default_style') entry, with the chosen print/PDF font size applied.
+     */
+    public function defaultStyle(string $key): string
+    {
+        $style = (string) config("i-reports.default_style.{$key}", '');
+        $setup = $this->get('page_setup');
+
+        // Font size applies to cells only, not to row or stripe styles.
+        return $setup instanceof PageSetup && in_array($key, ['th', 'td', 'group', 'aggregate'], true) ? $setup->tableStyle($style) : $style;
+    }
+
     public function getExport(): string
     {
         $export = $this->requestData['export'] ?? 'view';

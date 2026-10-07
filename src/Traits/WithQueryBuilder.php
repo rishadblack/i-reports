@@ -4,12 +4,14 @@ namespace Rishadblack\IReports\Traits;
 
 use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Query\Expression;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
+use Illuminate\Support\LazyCollection;
 use Rishadblack\IReports\Views\Column;
 
 trait WithQueryBuilder
@@ -90,6 +92,50 @@ trait WithQueryBuilder
     }
 
     /**
+     * The export rows, read from the database in chunks.
+     *
+     * @return LazyCollection<int, Model>
+     */
+    public function exportRows(int $chunkSize): LazyCollection
+    {
+        return $this->withStableOrder($this->exportBuilder())->lazy($chunkSize);
+    }
+
+    /**
+     * Give an unordered query a deterministic order for chunked reads (lazy(), forPage()).
+     * Laravel's lazy() would otherwise order by the primary key, which MySQL strict mode
+     * rejects for GROUP BY and DISTINCT queries; those are ordered by their own columns.
+     */
+    public function withStableOrder(Builder $builder): Builder
+    {
+        $query = $builder->getQuery();
+
+        if (! empty($query->orders) || ! empty($query->unionOrders)) {
+            return $builder;
+        }
+
+        if (! empty($query->groups)) {
+            foreach ($query->groups as $group) {
+                $builder->orderBy($group);
+            }
+
+            return $builder;
+        }
+
+        if ($query->distinct) {
+            foreach ((array) $query->columns as $column) {
+                if (is_string($column) && ! str_contains($column, '*')) {
+                    return $builder->orderBy(preg_replace('/\s+as\s+.*$/i', '', $column) ?? $column);
+                }
+            }
+
+            return $builder;
+        }
+
+        return $builder->orderBy($builder->getModel()->qualifyColumn($builder->getModel()->getKeyName()));
+    }
+
+    /**
      * Always load the model key so format(), map() and links can use $row->id, unless the
      * query is grouped (adding a column would break GROUP BY) or already selects it.
      */
@@ -99,12 +145,15 @@ trait WithQueryBuilder
         $query = $builder->getQuery();
         $keyName = $builder->getModel()->getKeyName();
 
-        if (! empty($query->groups) || ! is_string($keyName) || $keyName === '') {
+        if (! empty($query->groups) || $query->distinct || ! empty($query->unions) || ! is_string($keyName) || $keyName === '') {
             return;
         }
 
         foreach ((array) $query->columns as $column) {
-            $column = is_string($column) ? $column : '';
+            // A raw select (selectRaw, DB::raw) may aggregate; adding the key would break it.
+            if (! is_string($column)) {
+                return;
+            }
 
             if ($column === '*' || str_ends_with($column, '.*') || $column === $keyName || str_ends_with($column, ' as '.$keyName) || $column === $builder->getModel()->qualifyColumn($keyName)) {
                 return;

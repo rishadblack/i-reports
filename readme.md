@@ -258,6 +258,8 @@ Column::make('Email', 'email')->hiddenByDefault(), // off until the user switche
 Column::make('Name', 'name')->hideable(false),     // always shown
 ```
 
+Hidden columns are also removed from the SQL: their `SELECT` and, for relation columns, their `JOIN` are skipped, which keeps wide reports fast. A hidden column stays in the query only while the active search, sort or `setGroupBy()` needs it. If `map()`, another column's `format()` or a custom view reads a column's value, mark it `->alwaysSelect()`.
+
 The model key is always selected (unless the query is grouped), so `format()` callbacks and links can use `$row->id`.
 
 ## Background exports

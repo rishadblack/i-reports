@@ -2,6 +2,7 @@
 
 use App\Models\Customer;
 use Illuminate\Support\HtmlString;
+use Rishadblack\IReports\Exports\QueryReportExport;
 use Rishadblack\IReports\Views\Column;
 
 it('parses relation names', function () {
@@ -116,3 +117,13 @@ it('serialises to an array without callbacks', function () {
 
     expect($array)->toMatchArray(['title' => 'Amount', 'name' => 'amount', 'type' => 'money', 'sortable' => true, 'searchable' => true, 'hide_in' => ['csv'], 'aggregate' => 'sum', 'align' => 'right', 'html' => false, 'style' => '[callback]']);
 });
+
+it('translates php date formats to excel formats', function (string $php, string $excel) {
+    expect(QueryReportExport::excelDateFormat($php))->toBe($excel);
+})->with([
+    ['d M Y', 'dd mmm yyyy'],
+    ['d/m/Y', 'dd/mm/yyyy'],
+    ['Y-m-d H:i', 'yyyy-mm-dd hh:mm'],
+    ['j F Y, g:i A', 'd mmmm yyyy, h:mm AM/PM'],
+    ['', 'dd mmm yyyy'],
+]);

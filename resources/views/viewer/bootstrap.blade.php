@@ -15,12 +15,14 @@
     ];
     $activeFilters = $this->activeFilters();
     $filterCount = $this->activeFilterCount();
+    $pageSetupEnabled = $this->pageSetupEnabled();
+    $pageSetupDefaults = $pageSetupEnabled ? $this->pageSetupOptions()['defaults'] : [];
 @endphp
 
 <div class="i-reports-viewer card border-0 shadow-sm overflow-hidden"
-    x-data="{ filtersOpen: false, exportOpen: false, presetsOpen: false, columnsOpen: false }"
+    x-data="{ filtersOpen: false, exportOpen: false, presetsOpen: false, columnsOpen: false, setupOpen: false, setupFormat: 'pdf', setupDefaults: @js($pageSetupDefaults), setup: @js($pageSetupDefaults) }"
     x-on:i-reports:filters-applied.window="filtersOpen = false"
-    x-on:keydown.escape.window="filtersOpen = false; exportOpen = false; presetsOpen = false; columnsOpen = false">
+    x-on:keydown.escape.window="filtersOpen = false; exportOpen = false; presetsOpen = false; columnsOpen = false; setupOpen = false">
 
     {{-- Header: title, record count, export menu --}}
     <div class="card-header bg-body border-bottom px-3 py-3">
@@ -69,7 +71,12 @@
                         @foreach ($exportOptions as $exportOption)
                             <li>
                                 <button type="button" class="dropdown-item d-flex align-items-center gap-2" role="menuitem" data-export="{{ $exportOption['type'] }}"
-                                    wire:click="exportAs('{{ $exportOption['type'] }}')" x-on:click="exportOpen = false">
+                                    @if ($pageSetupEnabled && in_array($exportOption['type'], ['print', 'pdf'], true))
+                                        x-on:click="exportOpen = false; setupFormat = @js($exportOption['type']); setupOpen = true"
+                                    @else
+                                        wire:click="exportAs('{{ $exportOption['type'] }}')" x-on:click="exportOpen = false"
+                                    @endif
+                                    >
                                     <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" class="text-body-secondary" viewBox="0 0 16 16" aria-hidden="true">{!! $exportIcons[$exportOption['type']] ?? $exportIcons['csv'] !!}</svg>
                                     {{ $exportOption['name'] }}
                                 </button>
@@ -303,11 +310,16 @@
         </div>
     @endif
 
+    <style>[x-cloak] { display: none !important; }</style>
+
+    @if ($pageSetupEnabled)
+        @include('i-reports::viewer.page-setup')
+    @endif
+
     {{-- Filter dialog (Bootstrap 5.3 modal markup, toggled by Alpine; no Bootstrap JS needed) --}}
     @if (count($filter_list) > 0 || $filter_extended_view)
-        <style>[x-cloak] { display: none !important; }</style>
         <div x-show="filtersOpen" x-cloak class="modal-backdrop fade show"></div>
-        <div x-show="filtersOpen" x-cloak class="modal fade show" x-bind:class="{ 'd-block': filtersOpen }" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="i-reports-filter-title" x-on:click.self="filtersOpen = false">
+        <div x-show="filtersOpen" x-cloak id="i-reports-filter-dialog" class="modal fade show" x-bind:class="{ 'd-block': filtersOpen }" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="i-reports-filter-title" x-on:click.self="filtersOpen = false">
             <div class="modal-dialog modal-lg modal-dialog-scrollable">
                 <div class="modal-content border-0 shadow">
                     <div class="modal-header">

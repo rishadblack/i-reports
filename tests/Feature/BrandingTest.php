@@ -75,9 +75,10 @@ it('prints a branded header with applied filters and a paged footer', function (
 
     $this->get(reportUrl(['export' => 'print', 'filters' => ['city' => 'Dhaka']]))
         ->assertOk()
-        ->assertSeeInOrder(['Acme Ltd', 'Customer List', 'Generated', 'Applied filters:', 'City:', 'Dhaka', 'Bob'])
+        ->assertSeeInOrder(['Acme Ltd', 'Customer List', 'Generated', 'Records', '1', 'Applied filters', 'City:', 'Dhaka', 'Bob'])
         ->assertSee('counter(page)', false)
-        ->assertSee('"Acme Ltd · Customer List"', false);
+        ->assertSee('"Acme Ltd · Customer List"', false)
+        ->assertSee('@page :first', false);
 });
 
 it('prints the same branded header when streaming', function () {
@@ -87,7 +88,8 @@ it('prints the same branded header when streaming', function () {
     $html = $this->get(reportUrl(['export' => 'print', 'filters' => ['city' => 'Dhaka']]))->assertOk()->streamedContent();
 
     expect($html)->toContain('Acme Ltd')
-        ->and($html)->toContain('Applied filters:')
+        ->and($html)->toContain('Applied filters')
+        ->and($html)->toContain('Records')
         ->and($html)->toContain('counter(page)')
         ->and(strpos($html, 'Acme Ltd'))->toBeLessThan(strpos($html, 'class="i-reports-table"'));
 });
@@ -101,7 +103,31 @@ it('keeps the plain iframe view free of the export header', function () {
 it('uses a custom header view instead of the built-in one', function () {
     config()->set('i-reports.header_view', 'partials.report-header');
 
-    $this->get(reportUrl(['export' => 'print']))->assertOk()->assertSee('Company Header')->assertDontSee('Generated ');
+    $this->get(reportUrl(['export' => 'print']))->assertOk()->assertSee('Company Header')->assertDontSee('Applied filters');
+});
+
+it('shows address, contact and the footer note in print and pdf', function () {
+    config()->set('i-reports.branding.name', 'Acme Ltd');
+    config()->set('i-reports.branding.address', '12 Lake Road, Dhaka');
+    config()->set('i-reports.branding.contact', 'hello@acme.test');
+    config()->set('i-reports.branding.footer_note', 'Confidential - internal use only');
+
+    $this->get(reportUrl(['export' => 'print']))
+        ->assertOk()
+        ->assertSeeInOrder(['12 Lake Road, Dhaka', 'hello@acme.test', 'Customer List'])
+        ->assertSee('"Confidential - internal use only"', false);
+
+    $html = view('i-reports::partials.pdf-page', ['branding' => brandedReport()->branding(3), 'pdfHeaderView' => null, 'pdfFooterView' => null])->render();
+
+    expect($html)->toContain('Confidential - internal use only')
+        ->and($html)->toContain('show-this-page="0"')
+        ->and($html)->toContain('{PAGENO}');
+});
+
+it('falls back to who generated the report in the footer', function () {
+    $this->actingAs(makeUser('Rina'));
+
+    expect(brandedReport()->branding()['footer_text'])->toStartWith('Generated ')->toEndWith(' by Rina');
 });
 
 it('escapes branding values', function () {

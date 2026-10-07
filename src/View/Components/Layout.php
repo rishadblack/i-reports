@@ -31,7 +31,7 @@ class Layout extends BaseComponent
             $this->headerView ??= $report->getHeaderView();
             $this->pdfHeaderView ??= $report->getPdfHeaderView();
             $this->pdfFooterView ??= $report->getPdfFooterView();
-            $branding = $report->branding();
+            $branding = $report->branding(in_array($this->context()->getExport(), ['print', 'pdf'], true) ? $report->total() : null);
         } else {
             $this->headerView ??= config('i-reports.header_view');
             $this->pdfHeaderView ??= config('i-reports.pdf_header_view');
@@ -41,9 +41,17 @@ class Layout extends BaseComponent
 
         $this->title ??= $this->context()->getReportTitle();
 
+        $printPart = $report instanceof BaseReportController ? $report->printPart() : null;
+        $branding['part'] = $printPart;
+
+        if ($printPart !== null) {
+            $this->title .= ' ('.__('part :part of :parts', ['part' => $printPart['part'], 'parts' => $printPart['parts']]).')';
+        }
+
         return view('i-reports::components.layout', [
             'headerTitle' => $this->context()->getHeaderTitle(),
             'branding' => $branding,
+            'printPart' => $printPart,
         ]);
     }
 
@@ -56,16 +64,24 @@ class Layout extends BaseComponent
     {
         $config = (array) config('i-reports.branding', []);
 
+        $generatedAt = now()->format((string) ($config['date_format'] ?? 'd M Y, h:i A'));
+
         return [
             'name' => (string) (($config['name'] ?? null) ?: ($this->context()->getHeaderTitle() ?? config('app.name'))),
             'tagline' => $config['tagline'] ?? null,
+            'address' => null,
+            'contact' => null,
+            'details' => [],
             'logo' => null,
             'logo_path' => null,
             'title' => (string) ($this->title ?? $this->context()->getReportTitle()),
             'accent' => (string) ($config['accent_color'] ?? '#1f2937'),
             'filters' => [],
-            'generated_at' => now()->format((string) ($config['date_format'] ?? 'd M Y, h:i A')),
+            'generated_at' => $generatedAt,
             'generated_by' => null,
+            'records' => null,
+            'footer_note' => $config['footer_note'] ?? null,
+            'footer_text' => (string) (($config['footer_note'] ?? null) ?: 'Generated '.$generatedAt),
         ];
     }
 }

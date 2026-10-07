@@ -86,12 +86,17 @@ return [
     |
     | name: organisation shown in headers and footers (null = report setHeaderTitle() or app.name).
     | logo: absolute path to a PNG or JPG; embedded in print, PDF and Excel.
+    | tagline, address, contact: optional lines shown under the name.
+    | footer_note: centre of every page footer (e.g. 'Confidential'); null shows who generated it.
     |
     */
     'branding' => [
         'name' => null,
         'tagline' => null,
+        'address' => null,
+        'contact' => null,
         'logo' => null,
+        'footer_note' => null,
         'accent_color' => '#1f2937',
         'show_filters' => true,
         'show_generated_by' => true,
@@ -118,9 +123,24 @@ return [
     |
     */
     'default_download_file_name' => 'report',
+    // columns: exports are built from the column definitions (fast, streamed, typed Excel cells).
+    // view: every output renders the report's own Blade view, like 0.1.x; use it when views compute
+    // running balances, totals or extra rows. A report can override it with setExportSource().
+    'export_source' => 'columns',
+    'columns_hideable' => true, // users may hide columns in the viewer; per column ->hideable(false|true)
     'excel_mode' => 'query',
     'export_chunk_size' => 1000,
     'stream_threshold' => 5000,      // above this many rows print and PDF stream in chunks (0 = always)
+
+    /*
+    | Large prints open in parts so the browser does not hang: above split_after rows the print
+    | page shows rows_per_part rows with Previous / Next buttons (0 = never split; stream instead).
+    */
+    'print' => [
+        'split_after' => 500,
+        'rows_per_part' => 1000,
+    ],
+
     'pdf_chunk_size' => 500,         // rows per mPDF WriteHTML call when streaming
     'pdf_chunk_page_break' => true,  // start each streamed PDF chunk on a new page (clean headers)
     'pdf_chunk_separator' => '<html-separator/>', // split marker for custom views, see <x-i-reports::chunk />
@@ -133,6 +153,26 @@ return [
     ],
     'pdf_paper_size' => 'A4',
     'pdf_orientation' => 'portrait',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Page setup dialog (print and PDF)
+    |--------------------------------------------------------------------------
+    |
+    | Choosing Print or PDF opens a dialog to pick paper, orientation, table font size and
+    | scale before exporting. Defaults: pdf_paper_size, pdf_orientation, font_size and scale
+    | below (a report can override each with setPaperSize(), setOrientation(), setFontSize()
+    | and setScale()). Only values in these lists are accepted from the browser.
+    |
+    */
+    'page_setup' => [
+        'enabled' => true,
+        'font_size' => null, // null = keep the sizes in default_style; or a size in pt, e.g. 9
+        'scale' => 100,
+        'papers' => ['A4', 'A3', 'A5', 'Letter', 'Legal'],
+        'font_sizes' => [7, 8, 9, 10, 11, 12],
+        'scales' => [50, 60, 70, 80, 90, 100, 110, 125, 150],
+    ],
     'pdf_header_view' => null, // running header on every PDF page (none by default)
     'pdf_footer_view' => null, // replaces the default footer: organisation, title, date, page X of Y
     'mpdf' => [

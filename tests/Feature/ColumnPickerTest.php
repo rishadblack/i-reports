@@ -130,3 +130,65 @@ it('keeps hidden columns in saved views', function () {
 
     $component->call('applyPreset', $preset->id)->assertSet('hidden_columns', ['city']);
 });
+
+/**
+ * SQL of the row query for the current context.
+ *
+ * @param  array<string, mixed>  $params
+ */
+function rowQuerySql(array $params): string
+{
+    app(ReportContext::class)->reset();
+    (new RequestHelper(['report' => 'customers'] + $params))->storeGlobally();
+
+    return app(app(ReportResolver::class)->resolve('customers'))->exportBuilder()->toSql();
+}
+
+it('removes hidden columns and their joins from the query', function () {
+    $all = rowQuerySql([]);
+    $trimmed = rowQuerySql(['hidden_columns' => ['country.name', 'amount']]);
+
+    expect($all)->toContain('"country"."name"')->toContain('left join "countries"')->toContain('"customers"."amount"')
+        ->and($trimmed)->not->toContain('"country"."name"')
+        ->and($trimmed)->not->toContain('left join "countries"')
+        ->and($trimmed)->not->toContain('"customers"."amount"')
+        ->and($trimmed)->toContain('"customers"."name"');
+});
+
+it('drops columns hidden in this output from the query', function () {
+    expect(rowQuerySql(['export' => 'csv']))->not->toContain('"customers"."joined_at"')
+        ->and(rowQuerySql(['export' => 'xlsx']))->toContain('"customers"."joined_at"');
+});
+
+it('keeps a hidden column in the query while search or sort uses it', function () {
+    expect(rowQuerySql(['hidden_columns' => ['country.name'], 'search' => 'ind']))->toContain('left join "countries"')
+        ->and(rowQuerySql(['hidden_columns' => ['amount'], 'sort_field' => 'amount']))->toContain('"customers"."amount"');
+
+    $this->get(reportUrl(['hidden_columns' => ['country.name'], 'search' => 'ind']))
+        ->assertOk()
+        ->assertSee('Bob')
+        ->assertDontSee('Alice')
+        ->assertDontSee('India');
+});
+
+it('keeps always-selected columns in the query when hidden', function () {
+    config()->set('i-reports.reports', ['picker' => AlwaysSelectReport::class]);
+
+    app(ReportContext::class)->reset();
+    (new RequestHelper(['report' => 'picker', 'hidden_columns' => ['city', 'amount']]))->storeGlobally();
+    $sql = app(app(ReportResolver::class)->resolve('picker'))->exportBuilder()->toSql();
+
+    expect($sql)->toContain('"customers"."city"')->not->toContain('"customers"."amount"');
+});
+
+class AlwaysSelectReport extends CustomersReport
+{
+    public function columns(): array
+    {
+        return [
+            Column::make('Name', 'name'),
+            Column::make('City', 'city')->alwaysSelect(),
+            Column::make('Amount', 'amount'),
+        ];
+    }
+}

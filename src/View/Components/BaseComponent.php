@@ -23,7 +23,7 @@ abstract class BaseComponent extends Component
 
     protected function defaultStyle(string $key): string
     {
-        return (string) config("i-reports.default_style.{$key}", '');
+        return $this->context()->defaultStyle($key);
     }
 
     /**

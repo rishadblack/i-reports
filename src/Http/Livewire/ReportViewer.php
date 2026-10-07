@@ -11,6 +11,7 @@ use Rishadblack\IReports\Events\ReportExportUpdated;
 use Rishadblack\IReports\Jobs\ExportReportJob;
 use Rishadblack\IReports\Models\QueuedExport;
 use Rishadblack\IReports\Models\ReportPreset;
+use Rishadblack\IReports\Support\PageSetup;
 use Rishadblack\IReports\Support\ReportContext;
 use Rishadblack\IReports\Traits\HasReportClass;
 use Rishadblack\IReports\Traits\WithReportViewer;
@@ -404,7 +405,13 @@ class ReportViewer extends Component
         $this->exportAs($format);
     }
 
-    public function exportAs(string $format): void
+    /**
+     * Export in the given format. For print and PDF, $pageSetup carries the export dialog's
+     * paper, orientation, font size and scale; anything not allowed falls back to the defaults.
+     *
+     * @param  array<string, mixed>  $pageSetup
+     */
+    public function exportAs(string $format, array $pageSetup = []): void
     {
         $format = strtolower($format);
 
@@ -417,13 +424,13 @@ class ReportViewer extends Component
         $this->syncTotals();
 
         if ($this->shouldQueue($format)) {
-            $this->queueExport($format);
+            $this->queueExport($format, $pageSetup);
             $this->export = '';
 
             return;
         }
 
-        $token = $this->requestHelper()->setExport($format)->setTotal(null)->generateToken();
+        $token = $this->requestHelper()->setExport($format)->setTotal(null)->setPageSetup($this->resolvePageSetup($format, $pageSetup))->generateToken();
         $url = route('i-reports.view', ['token' => $token]);
 
         $this->js('window.open('.json_encode($url).', "_blank")');
@@ -435,7 +442,10 @@ class ReportViewer extends Component
      * Generate the export in the background. With the exports table enabled, a tracking record
      * lets the viewer show its progress and a download button when it is ready.
      */
-    public function queueExport(string $format): void
+    /**
+     * @param  array<string, mixed>  $pageSetup
+     */
+    public function queueExport(string $format, array $pageSetup = []): void
     {
         $format = strtolower($format);
 
@@ -443,7 +453,7 @@ class ReportViewer extends Component
             return;
         }
 
-        $request = $this->requestHelper()->setExport($format)->setTotal(null)->toArray();
+        $request = $this->requestHelper()->setExport($format)->setTotal(null)->setPageSetup($this->resolvePageSetup($format, $pageSetup))->toArray();
         $record = null;
 
         if ($this->exports_enabled) {
@@ -731,6 +741,37 @@ class ReportViewer extends Component
         $context->setRequestData(array_merge($this->requestHelper()->toArray(), ['export' => 'inline']));
 
         return $report->toHtml();
+    }
+
+    /**
+     * Paper, orientation, font size and scale choices for the print/PDF export dialog.
+     *
+     * @return array{defaults: array{paper: string, orientation: string, font_size: float|null, scale: int}, papers: array<int, string>, orientations: array<int, string>, font_sizes: array<int, float>, scales: array<int, int>}
+     */
+    #[Computed]
+    public function pageSetupOptions(): array
+    {
+        return PageSetup::options($this->getReportInstance());
+    }
+
+    public function pageSetupEnabled(): bool
+    {
+        return (bool) config('i-reports.page_setup.enabled', true);
+    }
+
+    /**
+     * The validated page setup for print and PDF; empty for other formats.
+     *
+     * @param  array<string, mixed>  $pageSetup
+     * @return array<string, mixed>
+     */
+    protected function resolvePageSetup(string $format, array $pageSetup): array
+    {
+        if (! in_array($format, ['print', 'pdf'], true) || $pageSetup === [] || ! $this->pageSetupEnabled()) {
+            return [];
+        }
+
+        return PageSetup::resolve($this->getReportInstance(), $pageSetup)->toArray();
     }
 
     public function render(): View

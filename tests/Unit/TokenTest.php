@@ -83,6 +83,7 @@ it('builds tokens from the request helper with every field', function () {
         'sort_field' => 'name',
         'sort_direction' => 'desc',
         'hidden_columns' => [],
+        'page_setup' => [],
     ])->and(ReportTokenManager::resolve($helper->generateToken()))->toBe($helper->toArray());
 
     expect((new RequestHelper)->toArray()['export'])->toBe('view');

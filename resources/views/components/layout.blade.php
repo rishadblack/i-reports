@@ -28,6 +28,10 @@
     @include('i-reports::partials.pdf-page')
 @endif
 
+@if ($export === 'print' && $printPart)
+    @include('i-reports::partials.print-parts', ['printPart' => $printPart])
+@endif
+
 @if ($headerView && $export !== 'csv')
     @includeIf($headerView)
 @elseif (in_array($export, ['print', 'pdf']))
@@ -36,7 +40,7 @@
 
 {{ $slot }}
 
-@if ($export === 'print')
+@if ($export === 'print' && ($printPart === null || $printPart['auto_print']))
     <script>
         window.addEventListener('load', function () { window.print(); });
     </script>

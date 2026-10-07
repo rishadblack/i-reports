@@ -43,7 +43,9 @@ class ReportExporter
         $path = ($directory === '' ? '' : $directory.'/').$report->getFileName().'.'.$format;
 
         match ($format) {
-            'csv' => Storage::disk($disk)->put($path, $this->csvContent($report)),
+            'csv' => $report->usesViewForExports()
+                ? ExcelFacade::store($this->viewExport($report), $path, $disk, Excel::CSV)
+                : Storage::disk($disk)->put($path, $this->csvContent($report)),
             'xlsx' => $this->storeExcel($report, $disk, $path),
             'pdf' => Storage::disk($disk)->put($path, $report->pdfContent()),
             default => throw new InvalidArgumentException("Unsupported export format [{$format}]"),
@@ -58,9 +60,13 @@ class ReportExporter
     |--------------------------------------------------------------------------
     */
 
-    public function csvResponse(BaseReportController $report): StreamedResponse
+    public function csvResponse(BaseReportController $report): StreamedResponse|BinaryFileResponse
     {
         $fileName = $report->getFileName().'.csv';
+
+        if ($report->usesViewForExports()) {
+            return ExcelFacade::download($this->viewExport($report), $fileName, Excel::CSV, ['Content-Type' => 'text/csv; charset=UTF-8']);
+        }
 
         return response()->streamDownload(function () use ($report) {
             $handle = fopen('php://output', 'w');
@@ -96,7 +102,7 @@ class ReportExporter
         }
 
         if (config('i-reports.csv.title_rows', true)) {
-            foreach (ExcelSheetStyler::titleRows($report->branding()) as $titleRow) {
+            foreach (ExcelSheetStyler::titleRows($report->branding($report->total())) as $titleRow) {
                 if ($titleRow[0] !== '') {
                     fputcsv($handle, [$this->csvCell($titleRow[0])], $delimiter);
                 }
@@ -107,7 +113,7 @@ class ReportExporter
 
         fputcsv($handle, $columns->map(fn (Column $column) => $column->getTitle())->all(), $delimiter);
 
-        foreach ($report->exportBuilder()->lazy($chunkSize)->chunk($chunkSize) as $chunk) {
+        foreach ($report->exportRows($chunkSize)->chunk($chunkSize) as $chunk) {
             $rows = $report->map(new Collection($chunk->all()));
 
             foreach ($rows as $row) {
@@ -170,12 +176,20 @@ class ReportExporter
     public function excelExport(BaseReportController $report): object
     {
         if ($report->getExcelMode() === 'view') {
-            return (new ReportExport)
-                ->setCurrentView($report->getViewName())
-                ->setCurrentData($report->viewData(true));
+            return $this->viewExport($report);
         }
 
         return new QueryReportExport($report, 'xlsx');
+    }
+
+    /**
+     * The report's Blade view converted to a sheet (Excel view mode, and CSV for view-based reports).
+     */
+    public function viewExport(BaseReportController $report): ReportExport
+    {
+        return (new ReportExport)
+            ->setCurrentView($report->getViewName())
+            ->setCurrentData($report->viewData(true));
     }
 
     /*

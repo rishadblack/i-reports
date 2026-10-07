@@ -1,0 +1,1 @@
+<x-i-reports::table type="header"><x-i-reports::tbody><x-i-reports::tr><x-i-reports::td>Ledger Header: {{ $report_title }}</x-i-reports::td></x-i-reports::tr></x-i-reports::tbody></x-i-reports::table>

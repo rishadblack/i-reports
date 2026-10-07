@@ -32,6 +32,9 @@ class RequestHelper
     /** @var array<int, string> */
     protected array $hiddenColumns = [];
 
+    /** @var array<string, mixed> Paper, orientation, font size and scale chosen for print/PDF. */
+    protected array $pageSetup = [];
+
     /**
      * @param  array<string, mixed>  $params
      */
@@ -47,6 +50,7 @@ class RequestHelper
         $this->report = is_string($params['report'] ?? null) ? $params['report'] : '';
         $this->sortField = is_string($params['sort_field'] ?? null) && $params['sort_field'] !== '' ? $params['sort_field'] : null;
         $this->setSortDirection((string) ($params['sort_direction'] ?? 'asc'));
+        $this->setPageSetup(is_array($params['page_setup'] ?? null) ? $params['page_setup'] : []);
     }
 
     /**
@@ -116,6 +120,27 @@ class RequestHelper
         $this->hiddenColumns = array_values(array_unique(array_filter($columns, fn ($name) => is_string($name) && $name !== '')));
 
         return $this;
+    }
+
+    /**
+     * @param  array<string, mixed>  $setup
+     */
+    public function setPageSetup(array $setup): self
+    {
+        $this->pageSetup = array_filter(
+            array_intersect_key($setup, array_flip(['paper', 'orientation', 'font_size', 'scale'])),
+            fn ($value) => is_scalar($value) && $value !== '',
+        );
+
+        return $this;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getPageSetup(): array
+    {
+        return $this->pageSetup;
     }
 
     /**
@@ -198,6 +223,7 @@ class RequestHelper
             'sort_field' => $this->sortField,
             'sort_direction' => $this->sortDirection,
             'hidden_columns' => $this->hiddenColumns,
+            'page_setup' => $this->pageSetup,
         ];
     }
 

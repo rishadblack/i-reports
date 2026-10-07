@@ -5,6 +5,8 @@ use App\Models\Customer;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\RichText\RichText;
+use PhpOffice\PhpSpreadsheet\Shared\Date;
 use Rishadblack\IReports\Events\ReportExportCompleted;
 use Rishadblack\IReports\Exports\ReportExporter;
 use Rishadblack\IReports\Helpers\RequestHelper;
@@ -94,9 +96,10 @@ it('writes xlsx in query mode with headings, types, hideIn and aggregates', func
     expect($path)->toEndWith('.xlsx')
         ->and($rows[0][0])->toBe(config('app.name'))
         ->and($rows[1][0])->toBe('Customer List')
-        ->and($rows[2][0])->toStartWith('Generated ')
+        ->and($rows[2][0])->toStartWith('Generated: ')->toContain('Records: 3')
         ->and($rows[4])->toBe(['Name', 'City', 'Country', 'Amount', 'Active', 'Joined', 'Actions'])
-        ->and($rows[5])->toBe(['Alice', 'Khulna', 'Bangladesh', 250.5, 'Inactive', '15/02/2024', 'Edit'])
+        ->and(array_values(array_diff_key($rows[5], [5 => true])))->toBe(['Alice', 'Khulna', 'Bangladesh', 250.5, 'Inactive', 'Edit'])
+        ->and(Date::excelToDateTimeObject($rows[5][5])->format('Y-m-d'))->toBe('2024-02-15')
         ->and($rows[6][0])->toBe('Bob')
         ->and($rows[7][0])->toBe('Charlie')
         ->and($rows[8][0])->toBe('Total')
@@ -111,7 +114,7 @@ it('styles the xlsx sheet with a title block, frozen headings, autofilter, numbe
 
     expect($sheet->getTitle())->toBe('Customer List')
         ->and($sheet->getMergeCells())->toHaveKey('A1:G1')
-        ->and($sheet->getCell('A4')->getValue())->toBe('Applied filters: City: Dhaka')
+        ->and((string) $sheet->getCell('A4')->getValue())->toBe('Applied filters: City: Dhaka')
         ->and($sheet->getStyle('A1')->getFont()->getBold())->toBeTrue()
         ->and($sheet->getStyle('A5')->getFont()->getBold())->toBeTrue()
         ->and($sheet->getStyle('A5')->getFill()->getStartColor()->getRGB())->toBe('1F2937')
@@ -149,13 +152,39 @@ it('puts title rows above csv data and can turn them off', function () {
     expect($plain)->toStartWith("\xEF\xBB\xBFName,City,");
 });
 
+it('writes the xlsx title block as rich text with a logo and a running page header', function () {
+    Storage::fake('exports');
+    $logo = tempnam(sys_get_temp_dir(), 'logo').'.png';
+    file_put_contents($logo, base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='));
+    config()->set('i-reports.branding.name', 'Acme & Co');
+    config()->set('i-reports.branding.tagline', 'Wholesale');
+    config()->set('i-reports.branding.logo', $logo);
+    config()->set('i-reports.branding.footer_note', 'Confidential');
+
+    try {
+        $path = app(ReportExporter::class)->store(prepareReport(), 'xlsx', 'exports');
+        $sheet = IOFactory::load(Storage::disk('exports')->path($path))->getActiveSheet();
+        $footer = $sheet->getHeaderFooter();
+
+        expect($sheet->getCell('A1')->getValue())->toBeInstanceOf(RichText::class)
+            ->and((string) $sheet->getCell('A1')->getValue())->toBe('Acme & Co    Wholesale')
+            ->and($sheet->getDrawingCollection())->toHaveCount(1)
+            ->and($footer->getDifferentFirst())->toBeTrue()
+            ->and($footer->getOddHeader())->toContain('Acme && Co')
+            ->and($footer->getOddFooter())->toContain('Confidential')->toContain('Page &P of &N')
+            ->and($footer->getFirstHeader())->toBe('');
+    } finally {
+        @unlink($logo);
+    }
+});
+
 it('adds the branded header to xlsx view mode', function () {
     Storage::fake('exports');
 
     $path = app(ReportExporter::class)->store(prepareReport('grouped-customers'), 'xlsx', 'exports');
     $sheet = IOFactory::load(Storage::disk('exports')->path($path))->getActiveSheet();
 
-    expect($sheet->getCell('A2')->getValue())->toBe('Grouped Customers')
+    expect((string) $sheet->getCell('A2')->getValue())->toBe('Grouped Customers')
         ->and($sheet->getCell('A5')->getValue())->toBe('Name')
         ->and($sheet->getFreezePane())->toBe('A6');
 });
@@ -269,4 +298,27 @@ it('runs a queued export as the requesting user', function () {
     ExportReportJob::dispatchSync((new RequestHelper(['report' => 'customers']))->toArray(), 'xlsx', $user->id, 'exports');
 
     expect(Storage::disk('exports')->allFiles())->toHaveCount(1);
+});
+
+it('gives the xlsx a clean report look: no gridlines, padding, real dates and a record count', function () {
+    Storage::fake('exports');
+
+    $path = app(ReportExporter::class)->store(prepareReport(), 'xlsx', 'exports');
+    $sheet = IOFactory::load(Storage::disk('exports')->path($path))->getActiveSheet();
+
+    $zip = new ZipArchive;
+    $zip->open(Storage::disk('exports')->path($path));
+    $sheetXml = (string) $zip->getFromName('xl/worksheets/sheet1.xml');
+    $zip->close();
+
+    expect($sheetXml)->toContain('showGridLines="false"')
+        ->and((string) $sheet->getCell('A3')->getValue())->toContain('Records: 3')
+        ->and((string) $sheet->getCell('A4')->getValue())->toBe('Applied filters: None — showing all records')
+        ->and($sheet->getStyle('A6')->getAlignment()->getIndent())->toBe(1)
+        ->and($sheet->getStyle('D5')->getAlignment()->getHorizontal())->toBe('right')
+        ->and($sheet->getCell('F6')->getFormattedValue())->toBe('15/02/2024')
+        ->and($sheet->getStyle('F5')->getAlignment()->getHorizontal())->toBe('center')
+        ->and($sheet->getRowDimension(5)->getRowHeight())->toBe(26.0)
+        ->and($sheet->getTabColor()->getRGB())->toBe('1F2937')
+        ->and($sheet->getParent()->getProperties()->getTitle())->toBe('Customer List');
 });

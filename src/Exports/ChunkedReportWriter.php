@@ -32,14 +32,15 @@ class ChunkedReportWriter
         $report->publishToContext();
 
         $mpdf = $report->makeMpdf();
-        $mpdf->WriteHTML(view('i-reports::partials.styles')->render(), HTMLParserMode::HEADER_CSS);
-        $mpdf->WriteHTML($this->top($report, 'pdf'), HTMLParserMode::HTML_BODY);
+        $setup = $report->pageSetup();
+        $mpdf->WriteHTML($setup->scaleCss(view('i-reports::partials.styles')->render()), HTMLParserMode::HEADER_CSS);
+        $mpdf->WriteHTML($report->preparePdfHtml($this->top($report, 'pdf')), HTMLParserMode::HTML_BODY);
 
         $pageBreak = (bool) config('i-reports.pdf_chunk_page_break', true);
         $first = true;
 
         $this->tables($report, 'pdf', $this->pdfChunkSize(), function (string $table) use ($mpdf, $pageBreak, $report, &$first) {
-            $mpdf->WriteHTML(($first || ! $pageBreak ? '' : '<pagebreak />').$report->absolutizeLinks($table), HTMLParserMode::HTML_BODY);
+            $mpdf->WriteHTML(($first || ! $pageBreak ? '' : '<pagebreak />').$report->preparePdfHtml($table), HTMLParserMode::HTML_BODY);
             $first = false;
         });
 
@@ -93,8 +94,8 @@ class ChunkedReportWriter
 
         $tableStyle = 'border-collapse: collapse; width: 100%;';
         $open = '<table class="i-reports-table" style="'.$tableStyle.'"><thead>'.$html->header().'</thead><tbody>';
-        $groupStyle = (string) config('i-reports.default_style.group', '');
-        $aggregateStyle = (string) config('i-reports.default_style.aggregate', '');
+        $groupStyle = $report->context()->defaultStyle('group');
+        $aggregateStyle = $report->context()->defaultStyle('aggregate');
 
         $currentGroup = null;
         $groupTotals = $this->emptyTotals($aggregateColumns);
@@ -112,7 +113,7 @@ class ChunkedReportWriter
             return $row;
         };
 
-        foreach ($report->exportBuilder()->lazy($chunkSize)->chunk($chunkSize) as $chunk) {
+        foreach ($report->exportRows($chunkSize)->chunk($chunkSize) as $chunk) {
             $body = '';
 
             foreach ($report->map(new Collection($chunk->all())) as $row) {
@@ -167,11 +168,14 @@ class ChunkedReportWriter
         return view('i-reports::stream.top', [
             'export' => $export,
             'title' => $report->getReportTitle(),
+            'report_title' => $report->getReportTitle(),
+            'header_title' => $report->getHeaderTitle(),
+            'columns' => $report->getVisibleColumns($export)->all(),
             'headerTitle' => $report->getHeaderTitle(),
             'headerView' => $report->getHeaderView(),
             'pdfHeaderView' => $report->getPdfHeaderView(),
             'pdfFooterView' => $report->getPdfFooterView(),
-            'branding' => $report->branding(),
+            'branding' => $report->branding($report->total()),
         ])->render();
     }
 

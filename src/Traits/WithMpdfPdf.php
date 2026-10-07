@@ -26,7 +26,12 @@ trait WithMpdfPdf
 
     public function getStreamThreshold(): int
     {
-        return max(0, $this->stream_threshold ?? (int) config('i-reports.stream_threshold', 5000));
+        if ($this->stream_threshold !== null) {
+            return max(0, $this->stream_threshold);
+        }
+
+        // Streaming writes column-based tables; a view-based report must render its own view.
+        return $this->usesViewForExports() ? PHP_INT_MAX : max(0, (int) config('i-reports.stream_threshold', 5000));
     }
 
     /**
@@ -80,13 +85,17 @@ trait WithMpdfPdf
             @mkdir($tempDir, 0775, true);
         }
 
+        $setup = $this->pageSetup();
         $mpdf = new Mpdf(array_merge([
             'mode' => 'utf-8',
-            'format' => $this->getPaperSize(),
-            'orientation' => $this->getOrientation() === 'landscape' ? 'L' : 'P',
+            'format' => $setup->paper,
+            'orientation' => $setup->isLandscape() ? 'L' : 'P',
             'tempDir' => $tempDir,
             'autoScriptToLang' => true,
             'autoLangToFont' => true,
+            // Grow the top margin on pages with a running header so it never overlaps the table.
+            'setAutoTopMargin' => 'stretch',
+            'autoMarginPadding' => 3,
         ], (array) config('i-reports.mpdf', [])));
 
         $mpdf->SetTitle($this->getFileTitle());
@@ -110,13 +119,21 @@ trait WithMpdfPdf
         unset($html);
 
         foreach ($chunks as $index => $chunk) {
-            $chunk = $this->absolutizeLinks($chunk);
+            $chunk = $this->preparePdfHtml($chunk);
             $this->ensureBacktrackLimit(strlen($chunk));
             $mpdf->WriteHTML($chunk, HTMLParserMode::DEFAULT_MODE);
             unset($chunks[$index]);
         }
 
         return $mpdf->Output('', Destination::STRING_RETURN);
+    }
+
+    /**
+     * Get an HTML piece ready for mPDF: absolute links and the chosen scale applied.
+     */
+    public function preparePdfHtml(string $html): string
+    {
+        return $this->pageSetup()->scaleHtml($this->absolutizeLinks($html));
     }
 
     /**

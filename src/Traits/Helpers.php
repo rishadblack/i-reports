@@ -12,6 +12,7 @@ use Illuminate\Support\Str;
 use ReflectionClass;
 use Rishadblack\IReports\Exports\ChunkedReportWriter;
 use Rishadblack\IReports\Exports\ReportExporter;
+use Rishadblack\IReports\Support\PageSetup;
 use Rishadblack\IReports\Support\ReportContext;
 use Rishadblack\IReports\Views\Column;
 use Rishadblack\IReports\Views\Filter;
@@ -42,6 +43,14 @@ trait Helpers
     protected ?string $paper_size = null;
 
     protected ?string $orientation = null;
+
+    protected ?float $font_size = null;
+
+    protected ?int $scale = null;
+
+    protected ?string $export_source = null;
+
+    protected ?int $print_split_after = null;
 
     protected ?string $default_sort_field = null;
 
@@ -215,6 +224,49 @@ trait Helpers
         return $this->orientation ?? (string) config('i-reports.pdf_orientation', 'portrait');
     }
 
+    /**
+     * Default table font size (pt) for print and PDF; users may change it in the export dialog.
+     */
+    public function setFontSize(float $points): static
+    {
+        $this->font_size = $points;
+
+        return $this;
+    }
+
+    /**
+     * Null keeps the font sizes of config('i-reports.default_style').
+     */
+    public function getFontSize(): ?float
+    {
+        $configured = config('i-reports.page_setup.font_size');
+
+        return $this->font_size ?? (is_numeric($configured) ? (float) $configured : null);
+    }
+
+    /**
+     * Default print and PDF scale in percent; users may change it in the export dialog.
+     */
+    public function setScale(int $percent): static
+    {
+        $this->scale = $percent;
+
+        return $this;
+    }
+
+    public function getScale(): int
+    {
+        return $this->scale ?? (int) config('i-reports.page_setup.scale', 100);
+    }
+
+    /**
+     * The page setup for this request: the report defaults plus the user's export dialog choices.
+     */
+    public function pageSetup(): PageSetup
+    {
+        return PageSetup::resolve($this, $this->context()->getPageSetup());
+    }
+
     public function setDefaultSort(string $field, string $direction = 'asc'): static
     {
         $this->default_sort_field = $field;
@@ -261,7 +313,35 @@ trait Helpers
 
     public function getExcelMode(): string
     {
-        return $this->excel_mode ?? (config('i-reports.excel_mode') === 'view' ? 'view' : 'query');
+        if ($this->excel_mode !== null) {
+            return $this->excel_mode;
+        }
+
+        return $this->usesViewForExports() || config('i-reports.excel_mode') === 'view' ? 'view' : 'query';
+    }
+
+    /**
+     * Where print, PDF, Excel and CSV take their content from:
+     * - 'columns': the column definitions (fast, streamed, typed Excel cells; prints split into parts);
+     * - 'view': the report's own Blade view for every output, like 0.1.x. Use it when the view
+     *   computes values (running balances, totals, extra rows). PDF and print then render the
+     *   view with all rows (no streaming, no split print), and Excel and CSV convert the view.
+     */
+    public function setExportSource(string $source): static
+    {
+        $this->export_source = $source === 'view' ? 'view' : 'columns';
+
+        return $this;
+    }
+
+    public function getExportSource(): string
+    {
+        return $this->export_source ?? (config('i-reports.export_source') === 'view' ? 'view' : 'columns');
+    }
+
+    public function usesViewForExports(): bool
+    {
+        return $this->getExportSource() === 'view';
     }
 
     /**
@@ -320,9 +400,31 @@ trait Helpers
      */
     public function getSelectedColumnsForQuery(): Collection
     {
+        $export = $this->context()->getExport();
+
         return $this->getColumns()
             ->reject(fn (Column $column) => $column->isHidden())
-            ->reject(fn (Column $column) => $column->isCustom());
+            ->reject(fn (Column $column) => $column->isCustom())
+            ->filter(fn (Column $column) => $column->isAlwaysSelected()
+                || $this->context()->isColumnVisible($column, $export)
+                || $this->isColumnNeededByQuery($column));
+    }
+
+    /**
+     * A column the user hid (or hideIn() removes from this output) is left out of the SELECT
+     * and its relation JOIN is skipped, unless the active search or sort still uses it.
+     */
+    protected function isColumnNeededByQuery(Column $column): bool
+    {
+        if ($column->isSearchable() && $this->context()->getSearch() !== '') {
+            return true;
+        }
+
+        if ($this->getGroupBy() === $column->getName()) {
+            return true;
+        }
+
+        return $column->isSortable() && $this->context()->getSortField() === $column->getName();
     }
 
     /**
@@ -399,11 +501,12 @@ trait Helpers
     }
 
     /**
-     * Everything the branded header and footer of an export need.
+     * Everything the branded header and footer of an export need. Pass the record count when
+     * the caller knows it (or can afford a COUNT), so headers can show it.
      *
-     * @return array{name: string, tagline: string|null, logo: string|null, logo_path: string|null, title: string, accent: string, filters: array<int, array{key: string, label: string, value: string}>, generated_at: string, generated_by: string|null}
+     * @return array{name: string, tagline: string|null, address: string|null, contact: string|null, details: array<int, string>, logo: string|null, logo_path: string|null, title: string, accent: string, filters: array<int, array{key: string, label: string, value: string}>, generated_at: string, generated_by: string|null, records: int|null, footer_note: string|null, footer_text: string}
      */
-    public function branding(): array
+    public function branding(?int $records = null): array
     {
         $config = (array) config('i-reports.branding', []);
         $logoPath = is_string($config['logo'] ?? null) && is_file($config['logo']) ? $config['logo'] : null;
@@ -416,17 +519,27 @@ trait Helpers
 
         $user = auth()->user();
         $userName = $user ? ($user->name ?? $user->email ?? null) : null;
+        $generatedAt = now()->format((string) ($config['date_format'] ?? 'd M Y, h:i A'));
+        $generatedBy = ($config['show_generated_by'] ?? true) && is_scalar($userName) ? (string) $userName : null;
+        $text = fn (string $key): ?string => is_scalar($config[$key] ?? null) && trim((string) $config[$key]) !== '' ? trim((string) $config[$key]) : null;
+        $footerNote = $text('footer_note');
 
         return [
             'name' => (string) ($config['name'] ?? null ?: $this->getHeaderTitle()),
-            'tagline' => $config['tagline'] ?? null,
+            'tagline' => $text('tagline'),
+            'address' => $text('address'),
+            'contact' => $text('contact'),
+            'details' => array_values(array_filter([$text('address'), $text('contact')])),
             'logo' => $logo,
             'logo_path' => $logoPath,
             'title' => $this->getReportTitle(),
             'accent' => (string) ($config['accent_color'] ?? '#1f2937'),
             'filters' => ($config['show_filters'] ?? true) ? $this->appliedFilters() : [],
-            'generated_at' => now()->format((string) ($config['date_format'] ?? 'd M Y, h:i A')),
-            'generated_by' => ($config['show_generated_by'] ?? true) && is_scalar($userName) ? (string) $userName : null,
+            'generated_at' => $generatedAt,
+            'generated_by' => $generatedBy,
+            'records' => $records,
+            'footer_note' => $footerNote,
+            'footer_text' => $footerNote ?? 'Generated '.$generatedAt.($generatedBy !== null ? ' by '.$generatedBy : ''),
         ];
     }
 
@@ -487,14 +600,19 @@ trait Helpers
         $export = $this->context()->getExport();
         $builder = $this->exportBuilder();
 
-        if ($allRows || $this->context()->isFullExport()) {
+        $printPart = $allRows ? null : $this->printPart();
+
+        if ($printPart !== null) {
+            $datas = $this->map($this->withStableOrder($builder)->forPage($printPart['part'], $printPart['size'])->get());
+        } elseif ($allRows || $this->context()->isFullExport()) {
             $datas = $this->map($builder->get());
         } else {
             $datas = $this->paginate($builder);
             $datas->setCollection($this->map($datas->getCollection()));
         }
 
-        $aggregates = $this->aggregates();
+        // A split print shows the grand totals once, under the last part.
+        $aggregates = $printPart !== null && $printPart['part'] < $printPart['parts'] ? [] : $this->aggregates();
 
         $this->context()
             ->put('report', $this)
@@ -534,11 +652,83 @@ trait Helpers
             return app(ReportExporter::class)->download($this, $export);
         }
 
-        if ($export === 'print' && $this->shouldStream()) {
+        if ($export === 'print' && $this->printPart() === null && $this->shouldStream()) {
             return app(ChunkedReportWriter::class)->printResponse($this);
         }
 
         return $this->renderReport($this->getViewName(), $this->viewData());
+    }
+
+    /**
+     * Rows per part when a large print is split into parts (0 = never split).
+     */
+    /**
+     * Split prints above this many rows into parts (0 = never split).
+     */
+    public function setPrintSplitAfter(int $rows): static
+    {
+        $this->print_split_after = max(0, $rows);
+
+        return $this;
+    }
+
+    public function getPrintSplitAfter(): int
+    {
+        if ($this->print_split_after !== null) {
+            return $this->print_split_after;
+        }
+
+        // A view-based report computes running totals over all rows; splitting would restart them.
+        return $this->usesViewForExports() ? 0 : max(0, (int) config('i-reports.print.split_after', 500));
+    }
+
+    public function getPrintRowsPerPart(): int
+    {
+        return max(1, (int) config('i-reports.print.rows_per_part', 1000));
+    }
+
+    /**
+     * The part of a large print being shown. Above print.split_after rows, a print opens in
+     * parts of print.rows_per_part rows (browsers hang on a page with tens of thousands of
+     * rows); the "part" query parameter picks one. Null when the print is not split.
+     *
+     * @return array{part: int, parts: int, size: int, total: int, from: int, to: int, auto_print: bool}|null
+     */
+    public function printPart(): ?array
+    {
+        if ($this->context()->getExport() !== 'print' || $this->getPrintSplitAfter() === 0) {
+            return null;
+        }
+
+        $cached = $this->context()->get('print_part', false);
+
+        if ($cached !== false) {
+            return $cached;
+        }
+
+        $total = $this->total();
+        $part = null;
+
+        if ($total > $this->getPrintSplitAfter()) {
+            $size = $this->getPrintRowsPerPart();
+            $parts = (int) ceil($total / $size);
+            $requested = request()->query('part');
+            $current = min($parts, max(1, is_numeric($requested) ? (int) $requested : 1));
+
+            $part = [
+                'part' => $current,
+                'parts' => $parts,
+                'size' => $size,
+                'total' => $total,
+                'from' => ($current - 1) * $size + 1,
+                'to' => min($total, $current * $size),
+                'auto_print' => $requested === null,
+            ];
+        }
+
+        $this->context()->put('print_part', $part);
+
+        return $part;
     }
 
     /**
@@ -560,6 +750,7 @@ trait Helpers
             ->setColumns($this->getColumns()->all())
             ->setReportTitle($this->getReportTitle())
             ->setHeaderTitle($this->getHeaderTitle())
+            ->put('page_setup', in_array($this->context()->getExport(), ['print', 'pdf'], true) ? $this->pageSetup() : null)
             ->resetRendered();
     }
 

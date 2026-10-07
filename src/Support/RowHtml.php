@@ -40,9 +40,10 @@ class RowHtml
     public function __construct(array $columns, protected string $export, ?string $rowStyle = null)
     {
         $this->columns = array_values($columns);
-        $this->tdStyle = (string) config('i-reports.default_style.td', '');
-        $this->trStyle = $this->mergeStyles((string) config('i-reports.default_style.tr', ''), $rowStyle);
-        $this->zebraStyle = (string) config('i-reports.default_style.zebra', '');
+        $context = app(ReportContext::class);
+        $this->tdStyle = $context->defaultStyle('td');
+        $this->trStyle = $this->mergeStyles($context->defaultStyle('tr'), $rowStyle);
+        $this->zebraStyle = $context->defaultStyle('zebra');
 
         foreach ($this->columns as $index => $column) {
             if ($column->getStyle() instanceof Closure) {
@@ -66,7 +67,7 @@ class RowHtml
      */
     public function header(): string
     {
-        $thStyle = (string) config('i-reports.default_style.th', '');
+        $thStyle = app(ReportContext::class)->defaultStyle('th');
         $html = '<tr>';
 
         foreach ($this->columns as $column) {
