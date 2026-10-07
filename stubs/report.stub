@@ -1,0 +1,44 @@
+<?php
+
+namespace {{ namespace }};
+
+use {{ model }};
+use Illuminate\Database\Eloquent\Builder;
+use Rishadblack\IReports\BaseReportController;
+use Rishadblack\IReports\Views\Column;
+use Rishadblack\IReports\Views\Filter;
+
+class {{ class }} extends BaseReportController
+{
+    public function builder(): Builder
+    {
+        return {{ modelShort }}::query();
+    }
+
+    public function configure(): void
+    {
+        $this->setReportTitle('{{ title }}');
+        $this->setDefaultSort('id', 'desc');
+    }
+
+    /**
+     * @return array<int, Column>
+     */
+    public function columns(): array
+    {
+        return [
+            Column::make('ID', 'id')->sortable(),
+            Column::make('Created', 'created_at')->datetime()->sortable()->hideIn('csv'),
+        ];
+    }
+
+    /**
+     * @return array<int, Filter>
+     */
+    public function filters(): array
+    {
+        return [
+            Filter::make('Created', 'created_at')->dateRange()->column('created_at'),
+        ];
+    }
+}

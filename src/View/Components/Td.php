@@ -2,87 +2,78 @@
 
 namespace Rishadblack\IReports\View\Components;
 
-use Illuminate\Database\Eloquent\Model;
-use Rishadblack\IReports\Helpers\ReportHelper;
-use Rishadblack\IReports\Traits\StyleMergerTrait;
+use Illuminate\Contracts\View\View;
 use Rishadblack\IReports\Views\Column;
 
 class Td extends BaseComponent
 {
-    use StyleMergerTrait;
-
     public ?string $name;
 
     public ?Column $column;
 
-    public ?Model $row;
+    public mixed $row;
 
     public ?string $style;
 
     public mixed $value = null;
 
+    public bool $html = false;
+
     public ?string $custom;
 
     public ?string $skip;
 
-    protected static array $renderedColumns = [];
+    /** The escaped (or trusted) HTML to print. */
+    public string $output = '';
 
-    public function __construct(?string $name = null, ?Column $column = null, ?Model $row = null, ?string $style = null, ?string $custom = null, ?string $skip = null)
+    public function __construct(?string $name = null, ?Column $column = null, mixed $row = null, ?string $style = null, mixed $value = null, bool $html = false, ?string $custom = null, ?string $skip = null)
     {
         $this->name = $name;
         $this->column = $column;
         $this->row = $row;
         $this->style = $style;
+        $this->value = $value;
+        $this->html = $html;
         $this->custom = $custom;
         $this->skip = $skip;
     }
 
-    public static function resetRenderedColumns(): void
+    public function render(): View
     {
-        self::$renderedColumns = [];
-    }
-
-    public function render()
-    {
-        // Resolve column
         if ($this->name && ! $this->column) {
-            $this->column = ReportHelper::getColumnByName($this->name);
+            $this->column = $this->context()->getColumnByName($this->name);
         }
 
         $this->name = $this->name ?? $this->column?->getName();
 
-        if ($this->column?->isHidden()) {
-            return '';
+        if ($this->column !== null && ! $this->context()->isColumnVisible($this->column)) {
+            return $this->nothing();
         }
 
-        // If custom passed, only render when it matches
         if ($this->custom && $this->custom !== $this->name) {
-            return '';
+            return $this->nothing();
         }
 
-        // Skip if already rendered
-        if ($this->name && in_array($this->name, self::$renderedColumns)) {
-            return '';
+        if ($this->name && $this->context()->isRendered('td', $this->name)) {
+            return $this->nothing();
         }
 
-        if ($this->column && $this->row) {
-            $this->value = $this->column->applyFormat($this->column->getValue($this->row), $this->row, $this->column);
-        }
-
-        // Style merging
-        $columnStyle = $this->column?->applyStyle($this->row) ?? null;
-        $mergedStyle = $this->mergeStyles(config('i-reports.default_style.td'), $columnStyle);
-        $mergedStyle = $this->mergeStyles($mergedStyle, $this->style);
-        $this->style = $mergedStyle;
-
-        // Mark as rendered
         if ($this->name) {
-            self::$renderedColumns[] = $this->name;
+            $this->context()->markRendered('td', $this->name);
         }
 
         if ($this->skip) {
-            return '';
+            return $this->nothing();
         }
+
+        if ($this->value !== null) {
+            $this->output = $this->html ? (string) $this->value : e((string) $this->value);
+        } elseif ($this->column && $this->row !== null) {
+            $this->output = $this->column->render($this->row, $this->export());
+        }
+
+        $columnStyle = $this->column?->applyStyle($this->row);
+        $this->style = $this->mergeStyles($this->mergeStyles($this->defaultStyle('td'), $columnStyle), $this->style);
 
         return view('i-reports::components.td');
     }

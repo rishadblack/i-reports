@@ -4,6 +4,9 @@ namespace Rishadblack\IReports\Traits;
 
 trait StyleMergerTrait
 {
+    /**
+     * @return array<string, string>
+     */
     protected function parseStyleString(string $style): array
     {
         $rules = [];
@@ -21,8 +24,15 @@ trait StyleMergerTrait
         return $rules;
     }
 
+    /**
+     * @param  array<string, string>  $rules
+     */
     protected function buildStyleString(array $rules): string
     {
+        if (count($rules) === 0) {
+            return '';
+        }
+
         $parts = [];
         foreach ($rules as $key => $value) {
             $parts[] = "$key: $value";

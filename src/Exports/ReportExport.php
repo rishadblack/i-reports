@@ -4,71 +4,90 @@ namespace Rishadblack\IReports\Exports;
 
 use Illuminate\Contracts\View\View;
 use Maatwebsite\Excel\Concerns\FromView;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Events\AfterSheet;
+use PhpOffice\PhpSpreadsheet\Cell\Cell;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 
-class ReportExport implements FromView, ShouldAutoSize, WithEvents
+/**
+ * Excel export that converts the rendered Blade table ("view" excel mode), then adds the
+ * branded title block above it and the shared table styling.
+ */
+class ReportExport implements FromView, WithCustomValueBinder, WithEvents
 {
-    public string $currentView;
+    protected string $currentView = '';
 
-    public array $currentData = [];
+    /** @var array<string, mixed> */
+    protected array $currentData = [];
 
     public function view(): View
     {
         return view($this->currentView, $this->currentData);
     }
 
-    public function setCurrentView($currentView)
+    public function setCurrentView(string $currentView): static
     {
         $this->currentView = $currentView;
 
         return $this;
     }
 
-    public function setCurrentData($currentData)
+    /**
+     * @param  array<string, mixed>  $currentData
+     */
+    public function setCurrentData(array $currentData): static
     {
         $this->currentData = $currentData;
 
         return $this;
     }
 
+    /**
+     * @return array<class-string, callable>
+     */
     public function registerEvents(): array
     {
         return [
             AfterSheet::class => function (AfterSheet $event) {
-                $sheet = $event->sheet;
+                $branding = $this->currentData['branding'] ?? null;
 
-                // Merge cells for the logo row to span across columns
-                // $sheet->mergeCells('A1:C1');
+                if (! is_array($branding)) {
+                    return;
+                }
 
-                // Center the image and text in the merged cells
-                // $sheet->getStyle('A1:C1')->applyFromArray([
-                //     'alignment' => [
-                //         'horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER,
-                //         'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER,
-                //     ],
-                // ]);
+                $sheet = $event->sheet->getDelegate();
+                $sheet->insertNewRowBefore(1, ExcelSheetStyler::TITLE_ROWS);
 
-                // Adjust column widths to help center the content
-                // $sheet->getColumnDimension('A')->setWidth(30);
-                // $sheet->getColumnDimension('B')->setWidth(30);
-                // $sheet->getColumnDimension('C')->setWidth(30);
+                foreach (ExcelSheetStyler::titleRows($branding) as $index => $titleRow) {
+                    $sheet->setCellValue('A'.($index + 1), $titleRow[0]);
+                }
 
-                // Adjust the row height to fit the logo
-                // $sheet->getRowDimension(1)->setRowHeight(90);
+                $columnCount = Coordinate::columnIndexFromString($sheet->getHighestDataColumn());
+                $widths = [];
 
-                // // Apply styles to other rows if needed (e.g., headers)
-                // $sheet->getStyle('A2:C2')->applyFromArray([
-                //     'font' => [
-                //         'bold' => true,
-                //         'size' => 14,
-                //     ],
-                //     'alignment' => [
-                //         'horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER,
-                //     ],
-                // ]);
+                for ($index = 1; $index <= $columnCount; $index++) {
+                    $widths[$index] = 14;
+                }
+
+                $report = $this->currentData['report'] ?? null;
+
+                (new ExcelSheetStyler)->apply(
+                    $sheet,
+                    $branding,
+                    $columnCount,
+                    $sheet->getHighestDataRow(),
+                    count((array) ($this->currentData['aggregates'] ?? [])) > 0,
+                    $widths,
+                    [],
+                    is_object($report) && method_exists($report, 'getOrientation') ? $report->getOrientation() : 'portrait',
+                );
             },
         ];
+    }
+
+    public function bindValue(Cell $cell, mixed $value): bool
+    {
+        return (new SafeValueBinder)->bindValue($cell, $value);
     }
 }

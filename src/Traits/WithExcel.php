@@ -2,33 +2,24 @@
 
 namespace Rishadblack\IReports\Traits;
 
-use Maatwebsite\Excel\Facades\Excel;
+use Maatwebsite\Excel\Excel;
+use Maatwebsite\Excel\Facades\Excel as ExcelFacade;
 use Rishadblack\IReports\Exports\ReportExport;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 trait WithExcel
 {
     /**
-     * Export to Excel using the given Blade HTML view.
+     * Export the given Blade view as a spreadsheet (kept for custom layouts).
      *
-     * @param  string  $view  View path (e.g., 'reports.user-report')
-     * @param  array  $data  Data to pass to the view
-     * @param  string  $type  File type: xlsx, csv, etc.
-     * @param  string  $filename  Custom filename (without extension)
-     * @return BinaryFileResponse
+     * @param  array<string, mixed>  $data
      */
-    protected function exportExcelFromView(
-        string $view,
-        array $data = [],
-        string $type = 'xlsx',
-        string $filename = ''
-    ) {
-        $export = new ReportExport;
-        $export->setCurrentView($view);
-        $export->setCurrentData($data);
-
+    protected function exportExcelFromView(string $view, array $data = [], string $type = 'xlsx', string $filename = ''): BinaryFileResponse
+    {
+        $export = (new ReportExport)->setCurrentView($view)->setCurrentData($data);
         $filename = $filename ?: $this->getFileName();
+        $writer = strtoupper($type) === 'CSV' ? Excel::CSV : Excel::XLSX;
 
-        return Excel::download($export, "{$filename}.{$type}", constant(\Maatwebsite\Excel\Excel::class.'::'.strtoupper($type)));
+        return ExcelFacade::download($export, "{$filename}.{$type}", $writer);
     }
 }

@@ -1,6 +1,6 @@
 {
     "name": "rishadblack/i-reports",
-    "description": ":Reusable and extensible Laravel reporting package featuring dynamic report loading, Livewire-driven filters, export to PDF and Excel using blade views, and support for modular applications.",
+    "description": "Paginated, filterable Laravel reports with Livewire, print, PDF, Excel and CSV export from one Blade view.",
     "license": "MIT",
     "authors": [
         {
@@ -11,10 +11,14 @@
     ],
     "homepage": "https://github.com/rishadblack/i-reports",
     "keywords": [
-        "Laravel",
-        "IReports"
+        "laravel",
+        "livewire",
+        "reports",
+        "pdf",
+        "excel",
+        "csv",
+        "export"
     ],
-    "version": "0.1.7",
     "require": {
         "php": "^8.3",
         "illuminate/database": "^11.0|^12.0|^13.0",
@@ -24,6 +28,8 @@
         "mpdf/mpdf": "^8.2"
     },
     "require-dev": {
+        "larastan/larastan": "^3.0",
+        "laravel/pint": "^1.20",
         "orchestra/testbench": "^9.0|^10.0|^11.0",
         "pestphp/pest": "^3.8|^4.0",
         "pestphp/pest-plugin-laravel": "^3.0|^4.0"
@@ -36,11 +42,20 @@
     "autoload-dev": {
         "psr-4": {
             "Rishadblack\\IReports\\Tests\\": "tests",
-            "App\\": "tests/Fixtures/app/"
+            "App\\": "tests/Fixtures/app/",
+            "Modules\\": "tests/Fixtures/Modules/"
         }
     },
     "scripts": {
-        "test": "vendor/bin/pest"
+        "test": "vendor/bin/pest --compact",
+        "lint": "vendor/bin/pint",
+        "lint:check": "vendor/bin/pint --test",
+        "analyse": "vendor/bin/phpstan analyse --memory-limit=1G",
+        "check": [
+            "@lint:check",
+            "@analyse",
+            "@test"
+        ]
     },
     "config": {
         "sort-packages": true,
@@ -57,5 +72,7 @@
                 "IReports": "Rishadblack\\IReports\\Facades\\IReports"
             }
         }
-    }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
 }

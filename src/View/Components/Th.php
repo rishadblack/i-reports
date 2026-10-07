@@ -2,78 +2,76 @@
 
 namespace Rishadblack\IReports\View\Components;
 
-use Rishadblack\IReports\Helpers\ReportHelper;
-use Rishadblack\IReports\Traits\StyleMergerTrait;
+use Illuminate\Contracts\View\View;
 use Rishadblack\IReports\Views\Column;
 
 class Th extends BaseComponent
 {
-    use StyleMergerTrait;
+    public ?Column $column;
 
     public ?string $name;
 
-    public ?Column $column;
-
     public ?string $style;
-
-    public ?string $skip;
 
     public ?string $custom;
 
-    protected static array $renderedColumns = [];
+    public ?string $skip;
 
-    public function __construct(?string $name = null, ?Column $column = null, ?string $style = null, ?string $custom = null, ?string $skip = null)
+    public bool $sortable = true;
+
+    public ?string $sortDirection = null;
+
+    public string $mode = 'none';
+
+    public function __construct(?string $name = null, ?Column $column = null, ?string $style = null, ?string $custom = null, ?string $skip = null, bool $sortable = true)
     {
         $this->name = $name;
         $this->column = $column;
         $this->style = $style;
         $this->custom = $custom;
         $this->skip = $skip;
+        $this->sortable = $sortable;
     }
 
-    public static function resetRenderedColumns(): void
-    {
-        self::$renderedColumns = [];
-    }
-
-    public function render()
+    public function render(): View
     {
         if ($this->name && ! $this->column) {
-            $this->column = ReportHelper::getColumnByName($this->name);
+            $this->column = $this->context()->getColumnByName($this->name);
         }
+
         $this->name = $this->name ?? $this->column?->getName();
 
-        if ($this->column?->isHidden()) {
-            return '';
+        if ($this->column !== null && ! $this->context()->isColumnVisible($this->column)) {
+            return $this->nothing();
         }
 
-        // If custom passed, only render when it matches
         if ($this->custom && $this->custom !== $this->name) {
-            return '';
+            return $this->nothing();
         }
 
-        // Skip if already rendered
-        if ($this->name && in_array($this->name, self::$renderedColumns)) {
-            return '';
+        if ($this->name && $this->context()->isRendered('th', $this->name)) {
+            return $this->nothing();
         }
 
-        $columnStyle = null;
-        if ($this->column) {
-            $columnStyle = $this->column->applyStyle($this->row ?? null);
-        }
-
-        // Merge styles: default < column < passed style
-        $mergedStyle = $this->mergeStyles(config('i-reports.default_style.th'), $columnStyle);
-        $mergedStyle = $this->mergeStyles($mergedStyle, $this->style);
-        $this->style = $mergedStyle;
-
-        // Mark as rendered
         if ($this->name) {
-            self::$renderedColumns[] = $this->name;
+            $this->context()->markRendered('th', $this->name);
         }
 
         if ($this->skip) {
-            return '';
+            return $this->nothing();
+        }
+
+        $columnStyle = $this->column?->applyStyle();
+        $this->style = $this->mergeStyles($this->mergeStyles($this->defaultStyle('th'), $columnStyle), $this->style);
+
+        $export = $this->export();
+
+        if ($this->sortable && $this->column?->isSortable() && in_array($export, ['view', 'inline'], true)) {
+            $this->mode = $export === 'inline' ? 'wire' : 'message';
+
+            if ($this->context()->getSortField() === $this->column->getName()) {
+                $this->sortDirection = $this->context()->getSortDirection();
+            }
         }
 
         return view('i-reports::components.th');

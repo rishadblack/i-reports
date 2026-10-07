@@ -2,46 +2,44 @@
 
 namespace Rishadblack\IReports\Traits;
 
+use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
+use Illuminate\Database\Query\Expression;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Arr;
-use Rishadblack\IReports\Helpers\ReportHelper;
+use Illuminate\Pagination\Paginator;
 use Rishadblack\IReports\Views\Column;
 
 trait WithQueryBuilder
 {
-    protected Builder $builder;
+    protected ?Builder $builder = null;
 
-    protected ?string $primaryKey;
-
+    /** @var array<int, string|Expression> */
     protected array $additionalSelects = [];
 
-    public function setPrimaryKey(string $primaryKey)
-    {
-        $this->primaryKey = $primaryKey;
-
-        return $this;
-    }
+    /** @var array<string, string>|null */
+    protected ?array $relationTables = null;
 
     public function setBuilder(Builder $builder): void
     {
         $this->builder = $builder;
     }
 
-    public function setAdditionalSelects(string|array $selects): self
+    /**
+     * @param  string|Expression|array<int, string|Expression>  $selects
+     */
+    public function setAdditionalSelects(string|Expression|array $selects): static
     {
-        if (! is_array($selects)) {
-            $selects = [$selects];
-        }
-
-        $this->additionalSelects = $selects;
+        $this->additionalSelects = is_array($selects) ? array_values($selects) : [$selects];
 
         return $this;
     }
 
+    /**
+     * @return array<int, string|Expression>
+     */
     public function getAdditionalSelects(): array
     {
         return $this->additionalSelects;
@@ -49,40 +47,144 @@ trait WithQueryBuilder
 
     public function getBuilder(): Builder
     {
-        if (! isset($this->builder)) {
+        if ($this->builder === null) {
             $this->setBuilder($this->builder());
         }
 
         return $this->builder;
     }
 
-    public function baseBuilder(): Builder
+    /**
+     * A new, unmodified query from builder().
+     */
+    public function freshBuilder(): Builder
     {
-        $this->setBuilder($this->builder());
-        $this->setBuilder($this->joinRelations());
-        $this->setBuilder($this->applyFilters());
-        $this->setBuilder($this->applySearch());
-        $this->setBuilder($this->applySort());
+        return $this->builder();
+    }
+
+    /**
+     * The filtered, searched and sorted query with relation joins but without selects.
+     */
+    public function baseBuilder(?Builder $builder = null): Builder
+    {
+        $this->setBuilder($builder ?? $this->builder());
+        $this->joinRelations();
+        $this->applyFilters();
+        $this->applySearch();
+        $this->applySort();
 
         return $this->getBuilder();
     }
 
+    /**
+     * The query used to fetch rows: base query plus selects and additionalQuery().
+     */
+    public function exportBuilder(): Builder
+    {
+        $this->baseBuilder();
+        $this->selectFields();
+        $this->setBuilder($this->additionalQuery($this->getBuilder()));
+        $this->selectPrimaryKey();
+
+        return $this->getBuilder();
+    }
+
+    /**
+     * Always load the model key so format(), map() and links can use $row->id, unless the
+     * query is grouped (adding a column would break GROUP BY) or already selects it.
+     */
+    protected function selectPrimaryKey(): void
+    {
+        $builder = $this->getBuilder();
+        $query = $builder->getQuery();
+        $keyName = $builder->getModel()->getKeyName();
+
+        if (! empty($query->groups) || ! is_string($keyName) || $keyName === '') {
+            return;
+        }
+
+        foreach ((array) $query->columns as $column) {
+            $column = is_string($column) ? $column : '';
+
+            if ($column === '*' || str_ends_with($column, '.*') || $column === $keyName || str_ends_with($column, ' as '.$keyName) || $column === $builder->getModel()->qualifyColumn($keyName)) {
+                return;
+            }
+        }
+
+        $builder->addSelect($builder->getModel()->qualifyColumn($keyName));
+    }
+
+    /**
+     * Count of rows matching the current filters and search.
+     */
+    public function total(): int
+    {
+        return $this->baseBuilder()->toBase()->getCountForPagination();
+    }
+
+    /**
+     * Paginate. When the viewer already counted the rows, the total travels in the token and
+     * no second COUNT query runs.
+     */
     public function paginate(Builder $query): LengthAwarePaginator
     {
-        $perPage = ReportHelper::getPerPage($this->getPagination());
+        $perPage = min($this->context()->getPerPage($this->getPagination()), (int) config('i-reports.max_per_page', 1000));
+        $page = $this->context()->getPage();
+        $total = $this->context()->getTotal();
 
-        return $query->paginate($perPage)->appends(request()->except('page'));
+        if ($total === null) {
+            return $query->paginate($perPage, ['*'], 'page', $page);
+        }
+
+        $items = $total > 0 ? $query->forPage($page, $perPage)->get() : $query->getModel()->newCollection();
+
+        return new LengthAwarePaginator($items, $total, $perPage, $page, [
+            'path' => Paginator::resolveCurrentPath(),
+            'pageName' => 'page',
+        ]);
+    }
+
+    /**
+     * Aggregates (sum, avg, ...) for the columns that asked for one, over the whole filtered set.
+     *
+     * @return array<string, mixed>
+     */
+    public function aggregates(): array
+    {
+        $columns = $this->getColumns()->filter(fn (Column $column) => $column->hasAggregate() && ! $column->isCustom());
+
+        if ($columns->isEmpty()) {
+            return [];
+        }
+
+        $query = $this->baseBuilder(clone $this->freshBuilder())->reorder();
+        $query->getQuery()->columns = null;
+        $grammar = $query->getQuery()->getGrammar();
+
+        foreach ($columns as $index => $column) {
+            $function = strtoupper($column->getAggregate());
+            $query->addSelect(new Expression("{$function}(".$grammar->wrap($column->getColumn()).') as '.$grammar->wrap("aggregate_{$index}")));
+        }
+
+        $row = $query->toBase()->first();
+        $results = [];
+
+        foreach ($columns as $index => $column) {
+            $results[$column->getName()] = $row->{"aggregate_{$index}"} ?? null;
+        }
+
+        return $results;
     }
 
     protected function applyFilters(): Builder
     {
-        $filters = ReportHelper::getFilters();
+        $values = $this->context()->getFilters();
 
-        foreach ($this->filters() as $filter) {
-            $field = $filter->key();
+        foreach ($this->getFilters() as $filter) {
+            $key = $filter->key();
 
-            if (array_key_exists($field, $filters) && filled($filters[$field])) {
-                $filter->apply($this->getBuilder(), $filters[$field]);
+            if (array_key_exists($key, $values)) {
+                $filter->apply($this->getBuilder(), $values[$key]);
             }
         }
 
@@ -91,71 +193,130 @@ trait WithQueryBuilder
 
     protected function applySearch(): Builder
     {
-        $search = ReportHelper::getSearch();
+        $search = $this->context()->getSearch();
 
-        // Get searchable column names from columns()
-        $searchableColumns = collect($this->columns())
-            ->filter(fn ($column) => $column->isSearchable())
-            ->map(fn ($column) => $column->getColumnSelectName())
-            ->all();
-
-        // Merge with $this->getSearchField() (which may return extra fields)
-        $fields = array_values(array_unique(array_merge($this->getSearchField(), $searchableColumns)));
-
-        if ($search && ! empty($search)) {
-            if (count($fields) > 0) {
-                $this->applySearchable($this->getBuilder(), $fields, $search);
-            }
-
-            return $this->search($this->getBuilder(), $search);
-            // return $this->getBuilder(), $search;
+        if ($search === '') {
+            return $this->getBuilder();
         }
 
-        return $this->getBuilder();
+        $searchableColumns = $this->getColumns()
+            ->filter(fn (Column $column) => $column->isSearchable() && ! $column->isCustom())
+            ->map(fn (Column $column) => $column->getColumn())
+            ->all();
+
+        $extraFields = $this->getSearchField();
+
+        if (count($searchableColumns) > 0 || count($extraFields) > 0) {
+            $this->getBuilder()->where(function (Builder $query) use ($searchableColumns, $extraFields, $search) {
+                foreach ($searchableColumns as $qualifiedColumn) {
+                    $query->orWhere($qualifiedColumn, $this->likeOperator($query), "%{$search}%");
+                }
+
+                foreach ($extraFields as $field) {
+                    $this->applySearchField($query, $field, $search);
+                }
+            });
+        }
+
+        return $this->setBuilderAndGet($this->search($this->getBuilder(), $search));
+    }
+
+    /**
+     * Search an extra field: "field", "col->json.key" or "relation.nested.field".
+     */
+    protected function applySearchField(Builder $query, string $field, string $search): void
+    {
+        $segments = explode('.', $field);
+        $column = array_pop($segments);
+        $relationPath = implode('.', $segments);
+
+        if ($relationPath === '') {
+            $query->orWhere($query->getModel()->getTable().'.'.$column, $this->likeOperator($query), "%{$search}%");
+
+            return;
+        }
+
+        $query->orWhereHas($relationPath, function (Builder $relationQuery) use ($column, $search) {
+            $relationQuery->where($relationQuery->getModel()->getTable().'.'.$column, $this->likeOperator($relationQuery), "%{$search}%");
+        });
+    }
+
+    protected function likeOperator(Builder $query): string
+    {
+        $connection = $query->getConnection();
+
+        return $connection instanceof Connection && $connection->getDriverName() === 'pgsql' ? 'ilike' : 'like';
     }
 
     protected function applySort(): Builder
     {
-        $sortField = ReportHelper::getSortField();
-        $sortDirection = ReportHelper::getSortDirection();
+        $requested = $this->context()->getSortField();
+        $direction = $this->context()->getSortDirection();
+        $sortColumn = null;
 
-        // Fall back to the default sort set with setDefaultSort()
-        if (! $sortField) {
-            [$sortField, $sortDirection] = $this->getDefaultSortField();
-            $sortDirection = strtolower($sortDirection ?? 'asc');
+        if ($requested !== null) {
+            $column = $this->getColumnByName($requested);
+
+            if ($column !== null && $column->isSortable() && ! $column->isCustom()) {
+                $sortColumn = $column->getColumn();
+            }
         }
 
-        $allowedDirections = ['asc', 'desc'];
-        if (! in_array($sortDirection, $allowedDirections)) {
-            $sortDirection = 'asc';
+        if ($sortColumn === null) {
+            [$sortColumn, $defaultDirection] = $this->getDefaultSortField();
+            $direction = strtolower($defaultDirection ?? 'asc');
+            $direction = in_array($direction, ['asc', 'desc'], true) ? $direction : 'asc';
         }
 
-        if ($sortField) {
-            $this->getBuilder()->orderBy($sortField, $sortDirection);
+        if ($sortColumn) {
+            $this->getBuilder()->orderBy($sortColumn, $direction);
         }
 
         return $this->getBuilder();
     }
 
+    /**
+     * The column the current request sorts by, when it is allowed.
+     *
+     * @return array{0: string, 1: string}|null
+     */
+    public function getActiveSort(): ?array
+    {
+        $requested = $this->context()->getSortField();
+
+        if ($requested === null) {
+            return null;
+        }
+
+        $column = $this->getColumnByName($requested);
+
+        if ($column === null || ! $column->isSortable()) {
+            return null;
+        }
+
+        return [$column->getName(), $this->context()->getSortDirection()];
+    }
+
     protected function selectFields(): Builder
     {
-        // Load any additional selects that were not already columns
+        $builder = $this->getBuilder();
+
         foreach ($this->getAdditionalSelects() as $select) {
-            $this->setBuilder($this->getBuilder()->addSelect($select));
+            $builder->addSelect($select);
         }
 
         foreach ($this->getSelectedColumnsForQuery() as $column) {
-            $this->setBuilder($this->getBuilder()->addSelect($column->getColumn().' as '.$column->getColumnSelectName()));
+            $builder->addSelect($column->getColumn().' as '.$column->getColumnSelectName());
         }
 
-        return $this->getBuilder();
+        return $builder;
     }
 
     protected function joinRelations(): Builder
     {
         foreach ($this->getSelectedColumnsForQuery() as $column) {
             if ($column->hasRelations()) {
-                $this->setBuilder($this->joinRelation($column));
+                $this->joinRelation($column);
             }
         }
 
@@ -164,47 +325,37 @@ trait WithQueryBuilder
 
     protected function joinRelation(Column $column): Builder
     {
-        $this->setBuilder($this->getBuilder()->with($column->getRelationString()));
-
-        $table = false;
-        $tableAlias = false;
-        $foreign = false;
-        $other = false;
-        $lastAlias = false;
-        $lastQuery = clone $this->getBuilder();
+        $tableAlias = null;
+        $lastAlias = null;
+        $lastModel = $this->getBuilder()->getModel();
 
         foreach ($column->getRelations() as $i => $relationPart) {
-            $model = $lastQuery->getRelation($relationPart);
+            $relation = $lastModel->{$relationPart}();
             $tableAlias = $this->getTableAlias($tableAlias, $relationPart);
+            $table = null;
+            $foreign = null;
+            $other = null;
 
-            switch (true) {
-                case $model instanceof MorphOne:
-                case $model instanceof HasOne:
-                    $table = "{$model->getRelated()->getTable()} AS $tableAlias";
-                    $foreign = "$tableAlias.{$model->getForeignKeyName()}";
-                    $other = $i === 0
-                    ? $model->getQualifiedParentKeyName()
-                    : $lastAlias.'.'.$model->getLocalKeyName();
-
-                    break;
-
-                case $model instanceof BelongsTo:
-                    $table = "{$model->getRelated()->getTable()} AS $tableAlias";
-                    $foreign = $i === 0
-                    ? $model->getQualifiedForeignKeyName()
-                    : $lastAlias.'.'.$model->getForeignKeyName();
-
-                    $other = "$tableAlias.{$model->getOwnerKeyName()}";
-
-                    break;
+            if ($relation instanceof HasOne || $relation instanceof MorphOne) {
+                $table = "{$relation->getRelated()->getTable()} AS {$tableAlias}";
+                $foreign = "{$tableAlias}.{$relation->getForeignKeyName()}";
+                $other = $i === 0 ? $relation->getQualifiedParentKeyName() : "{$lastAlias}.{$relation->getLocalKeyName()}";
+            } elseif ($relation instanceof BelongsTo) {
+                $table = "{$relation->getRelated()->getTable()} AS {$tableAlias}";
+                $foreign = $i === 0 ? $relation->getQualifiedForeignKeyName() : "{$lastAlias}.{$relation->getForeignKeyName()}";
+                $other = "{$tableAlias}.{$relation->getOwnerKeyName()}";
             }
 
-            if ($table) {
-                $this->setBuilder($this->performJoin($table, $foreign, $other));
+            if ($table !== null) {
+                $this->performJoin($table, $foreign, $other);
+
+                if ($relation instanceof MorphOne) {
+                    $this->getBuilder()->where("{$tableAlias}.{$relation->getMorphType()}", $relation->getMorphClass());
+                }
             }
 
             $lastAlias = $tableAlias;
-            $lastQuery = $model->getQuery();
+            $lastModel = $relation->getRelated();
         }
 
         return $this->getBuilder();
@@ -212,102 +363,45 @@ trait WithQueryBuilder
 
     protected function performJoin(string $table, string $foreign, string $other, string $type = 'left'): Builder
     {
-        $joins = [];
+        $joined = array_map(fn ($join) => $join->table, $this->getBuilder()->getQuery()->joins ?? []);
 
-        foreach ($this->getBuilder()->getQuery()->joins ?? [] as $join) {
-            $joins[] = $join->table;
-        }
-
-        if (! in_array($table, $joins, true)) {
-            $this->setBuilder($this->getBuilder()->join($table, $foreign, '=', $other, $type));
+        if (! in_array($table, $joined, true)) {
+            $this->getBuilder()->join($table, $foreign, '=', $other, $type);
         }
 
         return $this->getBuilder();
     }
 
-    protected function applySearchable(Builder $query, array $attributes, string $searchTerm): Builder
-    {
-        $query->where(function (Builder $query) use ($attributes, $searchTerm) {
-            $model = $query->getModel();
-            $table = $model->getTable();
-
-            foreach (Arr::wrap($attributes) as $attribute) {
-                $query->orWhere(function (Builder $subQuery) use ($attribute, $searchTerm, $table) {
-
-                    // Split into relation path + field
-                    $segments = explode('.', $attribute);
-                    $field = array_pop($segments);           // last part is always the field
-                    $relationPath = implode('.', $segments); // may be empty for direct field
-
-                    if ($relationPath) {
-                        // For relations (can be multi-level)
-                        $subQuery->orWhereHas($relationPath, function (Builder $relationQuery) use ($field, $searchTerm) {
-                            $relationTable = $relationQuery->getModel()->getTable();
-
-                            if (str_contains($field, '->')) {
-                                [$column, $jsonKey] = explode('->', $field, 2);
-                                $jsonPath = "$.$jsonKey";
-
-                                $relationQuery->whereRaw(
-                                    "LOWER(JSON_UNQUOTE(JSON_EXTRACT(`{$relationTable}`.`{$column}`, ?))) LIKE LOWER(?)",
-                                    [$jsonPath, "%{$searchTerm}%"]
-                                );
-                            } else {
-                                $relationQuery->whereRaw(
-                                    "LOWER(`{$relationTable}`.`{$field}`) LIKE LOWER(?)",
-                                    ["%{$searchTerm}%"]
-                                );
-                            }
-                        });
-                    } else {
-                        // For direct fields on the main model
-                        if (str_contains($field, '->')) {
-                            [$column, $jsonKey] = explode('->', $field, 2);
-                            $jsonPath = "$.$jsonKey";
-
-                            $subQuery->whereRaw(
-                                "LOWER(JSON_UNQUOTE(JSON_EXTRACT(`{$table}`.`{$column}`, ?))) LIKE LOWER(?)",
-                                [$jsonPath, "%{$searchTerm}%"]
-                            );
-                        } else {
-                            $subQuery->whereRaw(
-                                "LOWER(`{$table}`.`{$field}`) LIKE LOWER(?)",
-                                ["%{$searchTerm}%"]
-                            );
-                        }
-                    }
-                });
-            }
-        });
-
-        return $query;
-    }
-
+    /**
+     * Resolve the join alias for a relation column without touching the query.
+     */
     protected function getTableForColumn(Column $column): ?string
     {
-        $table = null;
-        $lastQuery = clone $this->getBuilder();
+        $alias = null;
+        $model = $this->getBuilder()->getModel();
 
         foreach ($column->getRelations() as $relationPart) {
+            $relation = $model->{$relationPart}();
 
-            $model = $lastQuery->getRelation($relationPart);
-            if ($model instanceof HasOne || $model instanceof BelongsTo || $model instanceof MorphOne) {
-
-                $table = $this->getTableAlias($table, $relationPart);
+            if ($relation instanceof HasOne || $relation instanceof BelongsTo || $relation instanceof MorphOne) {
+                $alias = $this->getTableAlias($alias, $relationPart);
             }
 
-            $lastQuery = $model->getQuery();
+            $model = $relation->getRelated();
         }
 
-        return $table;
+        return $alias;
     }
 
     protected function getTableAlias(?string $currentTableAlias, string $relationPart): string
     {
-        if (! $currentTableAlias) {
-            return $relationPart;
-        }
+        return $currentTableAlias ? $currentTableAlias.'_'.$relationPart : $relationPart;
+    }
 
-        return $currentTableAlias.'_'.$relationPart;
+    protected function setBuilderAndGet(Builder $builder): Builder
+    {
+        $this->setBuilder($builder);
+
+        return $builder;
     }
 }

@@ -1,57 +1,48 @@
-@if (!in_array($export, ['csv', 'xlsx']))
-    <!DOCTYPE html>
-    <html lang="en">
+@if (in_array($export, ['view', 'print', 'pdf']))
+<!DOCTYPE html>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ $title }}</title>
+    <style>
+        @include('i-reports::partials.styles')
 
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <meta http-equiv="X-UA-Compatible" content="ie=edge">
-        <title>{{ $report_title }}</title>
-        <style>
-            @page {
-                header: page-header;
-                footer: page-footer;
-            }
+        @if ($export === 'print')
+            @include('i-reports::partials.print-page')
+        @endif
 
-            @font-face {
-                font-family: 'SolaimanLipi';
-                src: url('{{ url('fonts/SolaimanLipi.ttf') }}') format('truetype');
-            }
-
-            body {
-                font-family: 'SolaimanLipi', sans-serif;
-                font-size: 12px;
-            }
-        </style>
-        @stack('styles')
-    </head>
-
-    <body>
+        @if ($export === 'view')
+        thead th {
+            position: sticky;
+            top: 0;
+        }
+        @endif
+    </style>
+    @stack('styles')
+</head>
+<body>
 @endif
 
-@includeIf(config('i-reports.header_view'))
+@if ($export === 'pdf')
+    @include('i-reports::partials.pdf-page')
+@endif
+
+@if ($headerView && $export !== 'csv')
+    @includeIf($headerView)
+@elseif (in_array($export, ['print', 'pdf']))
+    @include('i-reports::partials.report-header')
+@endif
 
 {{ $slot }}
 
-@if (in_array($export, ['pdf', 'print']))
-    @if (in_array($export, ['pdf']))
-        <htmlpagefooter name="page-footer">
-            <table width="100%" style="font-size: 8pt;">
-                <tr>
-                    <td width="33%">{PAGENO}/{nbpg}</td>
-                    <td width="33%" align="center">{{ $header_title . ' | ' . $report_title }}</td>
-                    <td width="33%" align="right">{{ now()->format('d-m-Y H:i') }}</td>
-                </tr>
-            </table>
-        </htmlpagefooter>
-    @endif
+@if ($export === 'print')
+    <script>
+        window.addEventListener('load', function () { window.print(); });
+    </script>
+@endif
 
-    @if (in_array($export, ['print']))
-        <script>
-            window.print();
-        </script>
-    @endif
-    </body>
-
-    </html>
+@if (in_array($export, ['view', 'print', 'pdf']))
+</body>
+</html>
 @endif

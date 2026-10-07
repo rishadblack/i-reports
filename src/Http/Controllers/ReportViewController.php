@@ -3,53 +3,55 @@
 namespace Rishadblack\IReports\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Rishadblack\IReports\Helpers\ReportHelper;
 use Rishadblack\IReports\Helpers\RequestHelper;
+use Rishadblack\IReports\Services\ReportResolver;
 use Rishadblack\IReports\Services\ReportTokenManager;
-use Rishadblack\IReports\Traits\HasReportClass;
+use Rishadblack\IReports\Support\ReportContext;
+use Rishadblack\IReports\Support\Runtime;
 
+/**
+ * Renders a report (or returns its export) from a token issued by the viewer.
+ *
+ * Only the token is trusted. Query parameters other than the token are ignored.
+ */
 class ReportViewController
 {
-    use HasReportClass;
-
-    public function __invoke(Request $request)
+    public function __invoke(Request $request, ReportResolver $resolver, ReportContext $context): mixed
     {
-
         $token = $request->query('token');
 
-        if ($token) {
-            $resolved = ReportTokenManager::resolve($token);
-
-            if (! $resolved) {
-                abort(403, 'Invalid or expired report token.');
-            }
-
-            foreach ($resolved as $key => $value) {
-                $request->merge([$key => $value]);
-            }
+        if (! is_string($token) || $token === '') {
+            abort(403, 'A report token is required.');
         }
 
-        $requestHelper = new RequestHelper($request->all());
+        $resolved = ReportTokenManager::resolve($token);
+
+        if ($resolved === null) {
+            abort(403, 'Invalid or expired report token.');
+        }
+
+        $requestHelper = new RequestHelper($resolved);
+        $context->reset();
         $requestHelper->storeGlobally();
 
-        $report = ReportHelper::getReport();
+        $reportName = $requestHelper->getReport();
 
-        if (! $report) {
-            throw new \Exception("Report not found: {$report}");
+        if ($reportName === '') {
+            abort(404, 'Report not found.');
         }
 
-        $controllerClass = $this->findReportClass($report);
+        $report = app($resolver->resolve($reportName));
 
-        $reportInstance = app($controllerClass);
-
-        if (! $reportInstance) {
-            throw new \Exception("Report class not found: {$controllerClass}");
+        if (! $report->authorize()) {
+            abort(403, 'You are not allowed to view this report.');
         }
 
-        ReportHelper::setColumns($reportInstance->columns());
-        ReportHelper::setReportTitle($reportInstance->getReportTitle());
-        ReportHelper::setHeaderTitle($reportInstance->getHeaderTitle());
+        Runtime::disableDebugbar();
 
-        return $reportInstance->view();
+        if ($context->isFullExport()) {
+            Runtime::prepareForExport();
+        }
+
+        return $report->view();
     }
 }

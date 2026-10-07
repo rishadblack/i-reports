@@ -3,70 +3,94 @@
 namespace Rishadblack\IReports\Services;
 
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Str;
+use Throwable;
 
+/**
+ * Issues and resolves the short-lived tokens that carry a report request through the iframe URL.
+ *
+ * Tokens are either stored in the cache ("c:" prefix, nothing sensitive in the URL) or encrypted
+ * with the app key ("e:" prefix). Every token records the user that created it; it can only be
+ * resolved by that same user while `token_bind_user` is enabled.
+ */
 class ReportTokenManager
 {
     /**
-     * Store report data using cache (if enabled) or fallback to encryption.
+     * @param  array<string, mixed>  $data
      */
-    public static function store(array $data, int $ttlMinutes = 10): string
+    public static function store(array $data, ?int $ttlMinutes = null): string
     {
+        $ttlMinutes = $ttlMinutes ?? (int) config('i-reports.token_ttl', 10);
         $data['expires_at'] = now()->addMinutes($ttlMinutes)->toIsoString();
+        $data['user_id'] = Auth::id();
 
-        // Check config
-        if (Config::get('i-reports.use_cache_token') && self::supportsTags()) {
-            $token = Str::random(32);
-            Cache::put("ireport_token:$token", $data, now()->addMinutes($ttlMinutes));
+        if (config('i-reports.use_cache_token')) {
+            $token = Str::random(40);
+            Cache::put(self::cacheKey($token), $data, now()->addMinutes($ttlMinutes));
 
-            return "c:$token"; // c: = cache-based token
+            return "c:{$token}";
         }
 
-        // Else: encrypt
-        $json = json_encode($data);
-        $encrypted = Crypt::encryptString($json);
-
-        return 'e:'.base64_encode($encrypted); // e: = encrypted token
+        return 'e:'.base64_encode(Crypt::encryptString((string) json_encode($data)));
     }
 
     /**
-     * Resolve the token either from cache or encrypted string.
+     * @return array<string, mixed>|null
      */
     public static function resolve(string $token): ?array
     {
         try {
             if (Str::startsWith($token, 'c:')) {
-                $plainToken = Str::after($token, 'c:');
-                $data = Cache::get("ireport_token:$plainToken");
+                $data = Cache::get(self::cacheKey(Str::after($token, 'c:')));
             } elseif (Str::startsWith($token, 'e:')) {
-                $decoded = base64_decode(Str::after($token, 'e:'));
-                $json = Crypt::decryptString($decoded);
-                $data = json_decode($json, true);
+                $decoded = base64_decode(Str::after($token, 'e:'), true);
+
+                if ($decoded === false) {
+                    return null;
+                }
+
+                $data = json_decode(Crypt::decryptString($decoded), true);
             } else {
                 return null;
             }
-
-            if (! isset($data['expires_at']) || now()->gt(Carbon::parse($data['expires_at']))) {
-                return null; // Expired
-            }
-
-            return $data;
-        } catch (\Throwable $e) {
+        } catch (Throwable) {
             return null;
         }
+
+        if (! is_array($data) || ! isset($data['expires_at'])) {
+            return null;
+        }
+
+        if (now()->gt(Carbon::parse($data['expires_at']))) {
+            return null;
+        }
+
+        if (config('i-reports.token_bind_user', true) && array_key_exists('user_id', $data)) {
+            if ($data['user_id'] !== null && (string) $data['user_id'] !== (string) Auth::id()) {
+                return null;
+            }
+        }
+
+        unset($data['expires_at'], $data['user_id']);
+
+        return $data;
     }
 
     /**
-     * Check if current cache driver supports persistent storage.
+     * Remove a cache-based token so it can no longer be used.
      */
-    protected static function supportsTags(): bool
+    public static function forget(string $token): void
     {
-        $driver = Cache::getStore();
+        if (Str::startsWith($token, 'c:')) {
+            Cache::forget(self::cacheKey(Str::after($token, 'c:')));
+        }
+    }
 
-        return method_exists($driver, 'tags') &&
-        in_array(config('cache.default'), ['redis', 'memcached']);
+    protected static function cacheKey(string $token): string
+    {
+        return 'i-reports:token:'.$token;
     }
 }

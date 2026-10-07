@@ -1,0 +1,29 @@
+<?php
+
+use Livewire\Livewire;
+use Rishadblack\IReports\Helpers\RequestHelper;
+
+function {{ class }}Url(array $params = []): string
+{
+    return route('i-reports.view', [
+        'token' => (new RequestHelper(['report' => '{{ report }}', 'per_page' => 50] + $params))->generateToken(),
+    ]);
+}
+
+it('renders the {{ title }} report', function () {
+    $this->get({{ class }}Url())
+        ->assertOk()
+        ->assertSee('{{ title }}');
+});
+
+it('exports the {{ title }} report to csv', function () {
+    $response = $this->get({{ class }}Url(['export' => 'csv']))->assertOk();
+
+    expect($response->headers->get('content-disposition'))->toContain('.csv');
+});
+
+it('loads the {{ title }} report in the viewer', function () {
+    Livewire::test('i-reports.report-viewer', ['report' => '{{ report }}'])
+        ->assertOk()
+        ->assertSee('Showing');
+});

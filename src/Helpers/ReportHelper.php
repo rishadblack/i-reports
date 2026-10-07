@@ -2,110 +2,116 @@
 
 namespace Rishadblack\IReports\Helpers;
 
+use Rishadblack\IReports\Support\ReportContext;
 use Rishadblack\IReports\Views\Column;
 
+/**
+ * Static facade over the request-scoped ReportContext. Kept for backwards compatibility.
+ */
 class ReportHelper
 {
-    protected static $requestData = null;
+    public static function context(): ReportContext
+    {
+        return app(ReportContext::class);
+    }
 
-    protected static $columns = [];
-
-    protected static $report_title;
-
-    protected static $header_title;
-
+    /**
+     * @param  array<string, mixed>  $value
+     */
     public static function setRequestData(array $value): void
     {
-        self::$requestData = $value;
+        self::context()->setRequestData($value);
     }
 
+    /**
+     * @param  array<int, Column>  $columns
+     */
     public static function setColumns(array $columns): void
     {
-        self::$columns = $columns;
+        self::context()->setColumns($columns);
     }
 
+    /**
+     * @return array<int, Column>
+     */
     public static function getColumns(): array
     {
-        return self::$columns;
+        return self::context()->getColumns();
     }
 
     public static function getColumnByName(string $name): ?Column
     {
-        foreach (self::getColumns() as $column) {
-            if ($column->getName() === $name) {
-                return $column;
-            }
-        }
-
-        return null;
+        return self::context()->getColumnByName($name);
     }
 
-    public static function setReportTitle(string $report_title): void
+    public static function setReportTitle(string $reportTitle): void
     {
-        self::$report_title = $report_title;
+        self::context()->setReportTitle($reportTitle);
     }
 
     public static function getReportTitle(): ?string
     {
-        return self::$report_title;
+        return self::context()->getReportTitle();
     }
 
-    public static function setHeaderTitle(string $header_title): void
+    public static function setHeaderTitle(string $headerTitle): void
     {
-        self::$header_title = $header_title;
+        self::context()->setHeaderTitle($headerTitle);
     }
 
     public static function getHeaderTitle(): ?string
     {
-        return self::$header_title;
+        return self::context()->getHeaderTitle();
     }
 
-    public static function getRequestData(): ?array
+    /**
+     * @return array<string, mixed>
+     */
+    public static function getRequestData(): array
     {
-        return self::$requestData;
+        return self::context()->getRequestData();
     }
 
-    public static function getExport(): ?string
+    public static function getExport(): string
     {
-        return self::$requestData['export'] ?? null;
+        return self::context()->getExport();
     }
 
     public static function getPerPage(int $default = 25): int
     {
-        return self::$requestData['per_page'] ?? $default;
+        return self::context()->getPerPage($default);
     }
 
     public static function getPage(int $default = 1): int
     {
-        return self::$requestData['page'] ?? $default;
+        return self::context()->getPage($default);
     }
 
     public static function getReport(): ?string
     {
-        return self::$requestData['report'] ?? null;
+        return self::context()->getReport();
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public static function getFilters(): array
     {
-        return self::$requestData['filters'] ?? [];
+        return self::context()->getFilters();
     }
 
     public static function getSearch(): string
     {
-        $search = self::$requestData['search'] ?? '';
-
-        return is_string($search) ? trim($search) : '';
+        return self::context()->getSearch();
     }
 
     public static function getSortField(): ?string
     {
-        return self::$requestData['sort_field'] ?? null;
+        return self::context()->getSortField();
     }
 
     public static function getSortDirection(): string
     {
-        $direction = strtolower(self::$requestData['sort_direction'] ?? 'asc');
-
-        return in_array($direction, ['asc', 'desc']) ? $direction : 'asc';
+        return self::context()->getSortDirection();
     }
 }

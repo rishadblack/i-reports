@@ -2,31 +2,19 @@
 
 namespace Rishadblack\IReports\View\Components;
 
-use Rishadblack\IReports\Helpers\ReportHelper;
+use Illuminate\Contracts\View\View;
 
 class Table extends BaseComponent
 {
-    public $type;
+    public ?string $style;
 
-    public $style;
-
-    public function __construct(?string $type = 'table', ?string $style = null)
+    public function __construct(?string $style = null)
     {
-        $this->type = $type;
         $this->style = $style;
     }
 
-    public function render()
+    public function render(): View
     {
-        if ($this->type == 'header') {
-            $export = ReportHelper::getExport();
-
-            if (in_array($export, ['view'])) {
-                return '';
-            }
-
-        }
-
         return view('i-reports::components.table');
     }
 }
