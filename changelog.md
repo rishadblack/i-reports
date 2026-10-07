@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.2] - 2026-10-08
+
+### Changed
+
+- Allow `maatwebsite/excel` 4.x (`^3.1|^4.0`). Laravel 12 and 13 installs now get Laravel Excel 4 with PhpSpreadsheet 5; Laravel 11 stays on 3.1. The export code needed no changes and the full suite passes on both.
+- Dependencies refreshed and tested on PHP 8.4 (Symfony 8.1, Larastan 3.13). The Pint and PHPStan CI job now runs on PHP 8.4.
+
 ## [2.0.1] - 2026-10-07
 
 ### Fixed

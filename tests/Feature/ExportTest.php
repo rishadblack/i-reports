@@ -123,7 +123,7 @@ it('styles the xlsx sheet with a title block, frozen headings, autofilter, numbe
         ->and($sheet->getStyle('D6')->getNumberFormat()->getFormatCode())->toBe('#,##0.00')
         ->and($sheet->getStyle('A8')->getFont()->getBold())->toBeTrue()
         ->and($sheet->getHeaderFooter()->getOddFooter())->toContain('Page &P of &N')
-        ->and($sheet->getPageSetup()->getRowsToRepeatAtTop())->toBe(['5', '5']);
+        ->and(array_map('intval', $sheet->getPageSetup()->getRowsToRepeatAtTop()))->toBe([5, 5]);
 });
 
 it('stores formula-looking text as plain text in xlsx', function () {
