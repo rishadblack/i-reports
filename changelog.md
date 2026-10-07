@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.1] - 2026-10-07
+
+### Fixed
+
+- Test suite passes on the whole CI matrix (PHP 8.3/8.4, Laravel 11-13, Livewire 3/4). No package code changes.
+
 ## [2.0.0] - 2026-10-07
 
 First stable release of the rewrite (published as 2.0.0 because an older `1.1.5` tag exists). Everything in 1.0.0-beta.1 below, plus:
