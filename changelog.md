@@ -2,9 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.0.0] - 2026-10-07
+## [2.0.0] - 2026-10-07
 
-First stable 1.0 release. Everything in 1.0.0-beta.1 below, plus:
+First stable release of the rewrite (published as 2.0.0 because an older `1.1.5` tag exists). Everything in 1.0.0-beta.1 below, plus:
 
 ### Added
 
