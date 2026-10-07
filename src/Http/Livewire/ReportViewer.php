@@ -69,10 +69,12 @@ class ReportViewer extends Component
         $this->filter_list = collect($reportInstance->getFilters())->map(fn ($filter) => $filter->toArray())->values()->all();
 
         foreach ($this->filter_list as $filter) {
-            if ($filter['default'] !== null && ! array_key_exists($filter['name'], $this->filters)) {
-                $this->filters[$filter['name']] = $filter['default'];
+            if ($filter['default'] !== null && ! array_key_exists($filter['name'], $this->applied_filters)) {
+                $this->applied_filters[$filter['name']] = $filter['default'];
             }
         }
+
+        $this->filters = $this->applied_filters;
 
         $this->search = mb_substr(trim($this->search), 0, 255);
         $this->sort_direction = in_array($this->sort_direction, ['asc', 'desc'], true) ? $this->sort_direction : 'asc';
@@ -139,7 +141,7 @@ class ReportViewer extends Component
 
     public function resetReport(): void
     {
-        $this->reset(['filters', 'search', 'page', 'sort_field', 'sort_direction', 'export', 'export_message']);
+        $this->reset(['filters', 'applied_filters', 'search', 'page', 'sort_field', 'sort_direction', 'export', 'export_message']);
         $this->per_page = $this->getReportInstance()->getPagination();
         $this->hidden_columns = $this->defaultHiddenColumns();
         $this->applyFilterDefaults();
@@ -235,9 +237,9 @@ class ReportViewer extends Component
         } elseif ($key === '__sort') {
             $this->sort_field = null;
             $this->sort_direction = 'asc';
-        } elseif (array_key_exists($key, $this->filters)) {
-            unset($this->filters[$key]);
-            $this->updatedFilters(null, $key);
+        } elseif (array_key_exists($key, $this->applied_filters) || array_key_exists($key, $this->filters)) {
+            unset($this->applied_filters[$key], $this->filters[$key]);
+            $this->clearDependents($key, applied: true);
         }
 
         $this->firstPage();
@@ -303,18 +305,44 @@ class ReportViewer extends Component
         $this->page = max(1, min($page, $this->last_page));
     }
 
+    /**
+     * Clear filters (the dialog's "Clear filters"): back to the defaults, applied at once.
+     */
     public function filterReset(): void
     {
-        $this->reset(['filters']);
+        $this->reset(['filters', 'applied_filters']);
         $this->applyFilterDefaults();
         $this->firstPage();
     }
 
+    /**
+     * Apply the dialog's values to the report.
+     */
     public function filterSubmit(): void
     {
+        $this->applied_filters = $this->filters;
         $this->show_filters = false;
         $this->firstPage();
         $this->dispatch('i-reports:filters-applied');
+    }
+
+    /**
+     * Close the dialog without applying: the fields go back to the applied values.
+     */
+    public function discardFilters(): void
+    {
+        $this->filters = $this->applied_filters;
+    }
+
+    /**
+     * Whether the dialog holds changes that are not applied yet.
+     */
+    #[Computed]
+    public function hasPendingFilters(): bool
+    {
+        $normalise = fn (array $values): array => array_filter($values, fn ($value) => $value !== null && $value !== '' && $value !== []);
+
+        return $normalise($this->filters) != $normalise($this->applied_filters);
     }
 
     public function updatedSearch(): void
@@ -323,7 +351,9 @@ class ReportViewer extends Component
     }
 
     /**
-     * Clear dependent filters when their parent changes.
+     * A dialog value changed. Dependent filters are cleared. The report changes only for filters
+     * that apply on change, blur or while typing (->onChange(), ->onBlur(), ->live()); others
+     * wait for Apply.
      */
     public function updatedFilters(mixed $value, ?string $key = null): void
     {
@@ -331,11 +361,37 @@ class ReportViewer extends Component
             return;
         }
 
-        $parentKey = explode('.', $key)[0];
+        $name = explode('.', $key)[0];
+        $filter = collect($this->filter_list)->firstWhere('name', $name);
+        $appliesNow = $filter !== null && ($filter['update'] ?? 'defer') !== 'defer';
 
+        if ($appliesNow) {
+            if (array_key_exists($name, $this->filters)) {
+                $this->applied_filters[$name] = $this->filters[$name];
+            } else {
+                unset($this->applied_filters[$name]);
+            }
+
+            $this->page = 1;
+        }
+
+        $this->clearDependents($name, applied: $appliesNow);
+    }
+
+    /**
+     * Clear the filters that depend on $parent, in the dialog and, when $applied, in the report.
+     */
+    protected function clearDependents(string $parent, bool $applied): void
+    {
         foreach ($this->filter_list as $filter) {
-            if (($filter['depends_on'] ?? null) === $parentKey) {
+            if (($filter['depends_on'] ?? null) === $parent) {
                 $this->filters[$filter['name']] = null;
+
+                if ($applied) {
+                    unset($this->applied_filters[$filter['name']]);
+                }
+
+                $this->clearDependents($filter['name'], $applied);
             }
         }
     }
@@ -345,6 +401,7 @@ class ReportViewer extends Component
         foreach ($this->filter_list as $filter) {
             if ($filter['default'] !== null) {
                 $this->filters[$filter['name']] = $filter['default'];
+                $this->applied_filters[$filter['name']] = $filter['default'];
             }
         }
     }
@@ -434,7 +491,8 @@ class ReportViewer extends Component
         $url = route('i-reports.view', ['token' => $token]);
 
         $this->js('window.open('.json_encode($url).', "_blank")');
-        $this->dispatch('exportEvent', url: $url);
+        // Both payload shapes: event.url (1.x) and event[0].url (0.1.x listeners).
+        $this->dispatch('exportEvent', ['url' => $url], url: $url);
         $this->export = '';
     }
 
@@ -675,7 +733,7 @@ class ReportViewer extends Component
         ReportPreset::query()->updateOrCreate(
             ['user_id' => Auth::id(), 'report' => $this->report, 'name' => trim($this->preset_name)],
             ['state' => [
-                'filters' => $this->filters,
+                'filters' => $this->applied_filters,
                 'search' => $this->search,
                 'sort_field' => $this->sort_field,
                 'sort_direction' => $this->sort_direction,
@@ -701,7 +759,8 @@ class ReportViewer extends Component
         }
 
         $state = $preset->state ?? [];
-        $this->filters = is_array($state['filters'] ?? null) ? $state['filters'] : [];
+        $this->applied_filters = is_array($state['filters'] ?? null) ? $state['filters'] : [];
+        $this->filters = $this->applied_filters;
         $this->search = (string) ($state['search'] ?? '');
         $this->sort_field = $state['sort_field'] ?? null;
         $this->sort_direction = in_array($state['sort_direction'] ?? 'asc', ['asc', 'desc'], true) ? $state['sort_direction'] : 'asc';

@@ -29,7 +29,7 @@ return [
     */
     'route_prefix' => 'ireport',
     'route_middleware' => ['web'],
-    'route_throttle' => '60,1',
+    'route_throttle' => null, // e.g. '60,1' to limit report requests per minute
 
     /*
     |--------------------------------------------------------------------------
@@ -126,7 +126,13 @@ return [
     // columns: exports are built from the column definitions (fast, streamed, typed Excel cells).
     // view: every output renders the report's own Blade view, like 0.1.x; use it when views compute
     // running balances, totals or extra rows. A report can override it with setExportSource().
+    // When filters update the report: defer (default: only on the Apply filters button), or per
+    // filter ->live(300) (while typing, debounced), ->onChange(), ->onBlur(); 'live'/'change'/'blur' here
+    // makes that the default for every filter. filter_debounce is the default live delay in ms.
+    'filter_update' => 'defer',
+    'filter_debounce' => 500,
     'export_source' => 'columns',
+    'eager_load_relations' => true, // relation columns also eager load their relation, so views can use $row->relation
     'columns_hideable' => true, // users may hide columns in the viewer; per column ->hideable(false|true)
     'excel_mode' => 'query',
     'export_chunk_size' => 1000,

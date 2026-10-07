@@ -327,7 +327,7 @@
                             <h5 class="modal-title fw-semibold" id="i-reports-filter-title">Filters</h5>
                             <div class="small text-body-secondary">Narrow down {{ $this->reportTitle() }}</div>
                         </div>
-                        <button type="button" class="btn-close" aria-label="Close" x-on:click="filtersOpen = false"></button>
+                        <button type="button" class="btn-close" aria-label="Close" x-on:click="filtersOpen = false; $wire.discardFilters()"></button>
                     </div>
                     <div class="modal-body">
                         <div class="row g-3">
@@ -337,7 +337,10 @@
                     <div class="modal-footer justify-content-between">
                         <button type="button" class="btn btn-sm btn-link text-decoration-none text-danger px-0" wire:click="filterReset" wire:loading.attr="disabled">Clear filters</button>
                         <div class="d-flex gap-2">
-                            <button type="button" class="btn btn-sm btn-outline-secondary" x-on:click="filtersOpen = false">Cancel</button>
+                            @if ($this->hasPendingFilters)
+                                <span class="small text-body-secondary align-self-center" data-pending-filters>Changes not applied yet</span>
+                            @endif
+                            <button type="button" class="btn btn-sm btn-outline-secondary" x-on:click="filtersOpen = false; $wire.discardFilters()">Cancel</button>
                             <button type="button" class="btn btn-sm btn-primary" wire:click="filterSubmit" wire:loading.attr="disabled">Apply filters</button>
                         </div>
                     </div>

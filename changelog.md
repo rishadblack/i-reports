@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.0] - 2026-10-07
+
+First stable 1.0 release. Everything in 1.0.0-beta.1 below, plus:
+
+### Added
+
+- Page setup dialog for print and PDF: paper, orientation, table font size and scale (`page_setup` config; `setPaperSize()`, `setOrientation()`, `setFontSize()`, `setScale()`).
+- Large prints open in parts with Previous / Next (`print.split_after`, `print.rows_per_part`, `setPrintSplitAfter()`).
+- Professional header and footer for print, PDF and Excel: logo, name, tagline, address, contact, info band (generated, prepared by, records, filters), running header from page 2, `footer_note`.
+- `export_source` (`columns` or `view`, `setExportSource()`): `view` renders the report's own Blade view for every output, as in 0.1.x. Excel and CSV convert the view, PDF never streams, print never splits.
+- `columns_hideable` config to turn the column picker off; `eager_load_relations` (default true).
+- Filter update modes: `->live($ms)`, `->onChange()`, `->onBlur()`, `->deferred()` and `filter_update` / `filter_debounce` config. By default the report changes only when **Apply filters** is clicked; the dialog edits a draft (`filters`) that Apply copies to `applied_filters`, and Cancel discards it.
+- Excel: real dates in the column's format, cleaner sheet (no gridlines, padding, rich-text title block, logo).
+
+### Fixed (compatibility with 0.1.x)
+
+- `<x-i-reports::table type="header">` is hidden on screen again and shown in exports.
+- Custom header views receive `$report_title` and `$header_title` in streamed print and PDF.
+- `custom()->searchable()` columns are searched again; JSON search fields support nested keys (`col->a.b`) and ignore case.
+- The total count includes conditions added in `additionalQuery()`.
+- `select()` and `text()` filters pass lists to callbacks that accept arrays (scalar-typed callbacks get the first value).
+- Blade filter components receive `key` and `datalist` again; Livewire filter components receive `key`.
+- `exportEvent` carries both `event.url` and `event[0].url`; the `exportIframe` listener is back.
+- The primary key is not added to `DISTINCT` or raw aggregate selects; chunked exports of grouped queries order by the group columns (MySQL strict mode).
+- Page setup keeps the font sizes of `default_style` unless a size is chosen.
+
+### Changed
+
+- `route_throttle` is off by default (`null`).
+
 ## [1.0.0-beta.1] - 2026-10-07
 
 First 1.0 beta: a rewrite focused on security, Octane safety, very large exports, a Bootstrap 5.3 viewer and branded exports. Breaking changes from 0.1.x are listed under **Changed** and **Removed**.

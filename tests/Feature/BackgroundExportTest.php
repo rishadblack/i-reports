@@ -20,6 +20,7 @@ it('queues large exports per format threshold and tracks them', function () {
 
     Livewire::test(ReportViewer::class, ['report' => 'customers'])
         ->set('filters.city', 'Dhaka')
+        ->call('filterSubmit')
         ->call('exportAs', 'csv')
         ->assertDispatched('exportEvent')
         ->call('exportAs', 'pdf')

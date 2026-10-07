@@ -39,6 +39,7 @@ abstract class TestCase extends Orchestra
         $app['config']->set('i-reports.presets.enabled', true);
         $app['config']->set('i-reports.queue.enabled', true);
         $app['config']->set('i-reports.queue.disk', 'exports');
+        $app['config']->set('i-reports.route_throttle', '60,1');
         $app['config']->set('view.paths', [__DIR__.'/Fixtures/resources/views']);
     }
 

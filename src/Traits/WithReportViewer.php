@@ -15,9 +15,12 @@ use Rishadblack\IReports\Views\Filter;
  */
 trait WithReportViewer
 {
-    /** @var array<string, mixed> */
-    #[Url(except: [])]
+    /** @var array<string, mixed> Values being edited in the filter dialog; the report does not use them until applied. */
     public array $filters = [];
+
+    /** @var array<string, mixed> Filters the report is built with (Apply, or a live/change/blur filter). */
+    #[Url(as: 'filters', except: [])]
+    public array $applied_filters = [];
 
     #[Url(except: '')]
     public string $search = '';
@@ -56,7 +59,7 @@ trait WithReportViewer
     public function requestHelper(): RequestHelper
     {
         return new RequestHelper([
-            'filters' => $this->filters,
+            'filters' => $this->applied_filters,
             'search' => $this->search,
             'export' => $this->export ?: 'view',
             'per_page' => $this->per_page,

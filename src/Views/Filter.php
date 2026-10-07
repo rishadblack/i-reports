@@ -3,9 +3,13 @@
 namespace Rishadblack\IReports\Views;
 
 use Closure;
+use Composer\InstalledVersions;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use InvalidArgumentException;
+use ReflectionFunction;
+use ReflectionNamedType;
+use ReflectionUnionType;
 use Throwable;
 
 /**
@@ -45,7 +49,13 @@ class Filter
 
     protected mixed $default = null;
 
-    protected string $responseTime = '500';
+    /** Debounce in ms for live filters; null uses config('i-reports.filter_debounce'). */
+    protected ?string $responseTime = null;
+
+    /** When the value reaches the server: defer (Apply button), change, blur or live. Null uses config. */
+    protected ?string $updateMode = null;
+
+    public const UPDATE_MODES = ['defer', 'change', 'blur', 'live'];
 
     /** @var Closure|null */
     protected $displayCallback;
@@ -221,6 +231,94 @@ class Filter
         return $this;
     }
 
+    /**
+     * When the filter applies:
+     * - defer: on the Apply filters button (default; the report changes only when Apply is clicked);
+     * - live: while typing, after $debounceMs without input (500 ms unless given);
+     * - change: as soon as the value changes (a select is picked, a date is set, an input is left after editing);
+     * - blur: when the user leaves the field.
+     */
+    public function updateOn(string $mode, ?int $debounceMs = null): static
+    {
+        if (! in_array($mode, self::UPDATE_MODES, true)) {
+            throw new InvalidArgumentException("Unknown filter update mode [{$mode}]");
+        }
+
+        $this->updateMode = $mode;
+
+        if ($debounceMs !== null) {
+            $this->responseTime = (string) max(0, $debounceMs);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Apply while typing, after $debounceMs without input (default: responseTime(), 500 ms).
+     */
+    public function live(?int $debounceMs = null): static
+    {
+        return $this->updateOn('live', $debounceMs);
+    }
+
+    public function onChange(): static
+    {
+        return $this->updateOn('change');
+    }
+
+    public function onBlur(): static
+    {
+        return $this->updateOn('blur');
+    }
+
+    public function deferred(): static
+    {
+        return $this->updateOn('defer');
+    }
+
+    public function getUpdateMode(): string
+    {
+        $mode = $this->updateMode ?? (string) config('i-reports.filter_update', 'defer');
+
+        return in_array($mode, self::UPDATE_MODES, true) ? $mode : 'defer';
+    }
+
+    /**
+     * The wire:model directive for this filter's mode, for the installed Livewire version:
+     * Livewire 4 needs .live with .change/.blur to send the value; Livewire 3 uses .lazy/.blur.
+     */
+    public function wireModel(): string
+    {
+        $debounce = max(0, (int) $this->getResponseTime());
+        $livewire4 = self::livewireMajor() >= 4;
+
+        return match ($this->getUpdateMode()) {
+            'live' => 'wire:model.live'.($debounce > 0 ? ".debounce.{$debounce}ms" : ''),
+            'change' => $livewire4 ? 'wire:model.live.change' : 'wire:model.lazy',
+            'blur' => $livewire4 ? 'wire:model.live.blur' : 'wire:model.blur',
+            default => 'wire:model',
+        };
+    }
+
+    protected static function livewireMajor(): int
+    {
+        static $major = null;
+
+        if ($major === null) {
+            $version = class_exists(InstalledVersions::class) && InstalledVersions::isInstalled('livewire/livewire')
+                ? (string) InstalledVersions::getVersion('livewire/livewire')
+                : '4.0.0';
+            $major = (int) $version;
+        }
+
+        return $major;
+    }
+
+    public function getResponseTime(): string
+    {
+        return $this->responseTime ?? (string) config('i-reports.filter_debounce', 500);
+    }
+
     public function customClass(string $customClass): static
     {
         $this->customClass = $customClass;
@@ -351,7 +449,6 @@ class Filter
             'date' => $this->validDate($this->scalar($value)),
             'number' => is_numeric($this->scalar($value)) ? $this->scalar($value) + 0 : null,
             'boolean' => $this->sanitizeBoolean($value),
-            'select', 'text' => is_scalar($value) || is_array($value) ? $this->scalar($value) : null,
             default => $this->sanitizeScalarOrList($value),
         };
     }
@@ -368,6 +465,10 @@ class Filter
         }
 
         if ($this->filterCallback instanceof Closure) {
+            if (is_array($value) && in_array($this->filterType, ['select', 'text'], true) && ! $this->callbackAcceptsArray()) {
+                $value = $this->scalar($value);
+            }
+
             ($this->filterCallback)($query, $value, $this);
 
             return;
@@ -386,7 +487,15 @@ class Filter
 
         switch ($this->filterType) {
             case 'text':
-                $query->where($column, 'like', '%'.$value.'%');
+                if (is_array($value)) {
+                    $query->where(function (Builder $any) use ($column, $value) {
+                        foreach ($value as $term) {
+                            $any->orWhere($column, 'like', '%'.$term.'%');
+                        }
+                    });
+                } else {
+                    $query->where($column, 'like', '%'.$value.'%');
+                }
                 break;
 
             case 'multi_select':
@@ -418,6 +527,30 @@ class Filter
             default:
                 is_array($value) ? $query->whereIn($column, $value) : $query->where($column, $value);
         }
+    }
+
+    /**
+     * Whether the callback's value parameter accepts an array (untyped, mixed, array or iterable).
+     * A list reaching a callback typed string or int is reduced to its first value instead.
+     */
+    protected function callbackAcceptsArray(): bool
+    {
+        if (! $this->filterCallback instanceof Closure) {
+            return true;
+        }
+
+        $parameter = (new ReflectionFunction($this->filterCallback))->getParameters()[1] ?? null;
+        $type = $parameter?->getType();
+
+        if ($type === null) {
+            return true;
+        }
+
+        $names = $type instanceof ReflectionNamedType
+            ? [$type->getName()]
+            : array_map(fn ($inner) => $inner instanceof ReflectionNamedType ? $inner->getName() : '', $type instanceof ReflectionUnionType ? $type->getTypes() : []);
+
+        return count(array_intersect($names, ['mixed', 'array', 'iterable'])) > 0;
     }
 
     protected function scalar(mixed $value): mixed
@@ -526,7 +659,9 @@ class Filter
             'filter_type' => $this->filterType,
             'component' => $this->component,
             'component_parameters' => $this->componentParameters,
-            'response_time' => $this->responseTime,
+            'response_time' => $this->getResponseTime(),
+            'update' => $this->getUpdateMode(),
+            'wire_model' => $this->wireModel(),
             'options' => $this->options,
             'depends_on' => $this->dependsOn,
             'default' => $this->default,

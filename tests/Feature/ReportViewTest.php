@@ -68,10 +68,11 @@ it('returns 403 when the report does not authorize the user', function () {
     $this->get(reportUrl([], 'secret'))->assertForbidden();
 });
 
-it('applies the throttle middleware to the report route', function () {
+it('applies the throttle middleware when configured, and ships without one', function () {
     $middleware = Route::getRoutes()->getByName('i-reports.view')->gatherMiddleware();
 
-    expect($middleware)->toContain('web')->toContain('throttle:60,1');
+    expect($middleware)->toContain('web')->toContain('throttle:60,1')
+        ->and((require __DIR__.'/../../config/i-reports.php')['route_throttle'])->toBeNull();
 });
 
 /*

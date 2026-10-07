@@ -256,6 +256,7 @@ it('lists the sortable columns in the toolbar', function () {
 it('dispatches an export url for every format and clears the selection', function (string $format) {
     Livewire::test(ReportViewer::class, ['report' => 'customers'])
         ->set('filters.city', 'Dhaka')
+        ->call('filterSubmit')
         ->set('export', $format)
         ->assertSet('export', '')
         ->assertDispatched('exportEvent', function (string $name, array $params) use ($format) {
@@ -280,6 +281,7 @@ it('queues an export on demand', function () {
 
     Livewire::test(ReportViewer::class, ['report' => 'customers'])
         ->set('filters.city', 'Khulna')
+        ->call('filterSubmit')
         ->call('queueExport', 'csv')
         ->assertDispatched('exportQueued')
         ->assertSet('export_message', fn (string $message) => str_contains($message, 'CSV'));

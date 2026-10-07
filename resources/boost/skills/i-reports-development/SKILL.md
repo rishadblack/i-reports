@@ -169,7 +169,7 @@ class UsersReport extends BaseReportController
 `Column::make(string $title, string $name)`. The title comes first.
 
 - `'field'` is a base-table column. `'relation.field'` (or `'a.b.field'`) follows `BelongsTo`, `HasOne` or `MorphOne` relation methods using LEFT JOINs.
-- `->searchable()` adds the column to the search box. `->sortable()` allows sorting it; other sort fields are rejected server side.
+- `->searchable()` adds the column to the search box (a `custom()` column is searched by its name: `field` on the base table or `relation.field` through `whereHas`). `->sortable()` allows sorting it; other sort fields are rejected server side.
 
 ### Types (optional)
 
@@ -237,6 +237,7 @@ Filter::make('Period', 'period')->bladeComponent('forms.period-picker', ['preset
 - `->column('table.col')` applies the default constraint for the type. `->filter(fn (Builder $query, $value) => ...)` replaces it and receives the sanitised value.
 - `->displayUsing(fn ($value) => 'Label')` turns stored ids into names for the filter chips and export headers. Use it on every `component()` or id-based filter.
 - `->default($value)`, `->placeholder('…')`, `->customClass('col-md-6')`, `->options([...])`.
+- **When a filter applies:** by default the report changes only when the user clicks **Apply filters** (plain `wire:model`). The dialog edits a draft (`filters`), and Apply copies it to `applied_filters`, which the report, URL, chips, exports and saved views use. Cancel discards unapplied edits. Per filter: `->live(300)` (applies while typing, debounced in ms), `->onChange()` (applies as soon as the value changes), `->onBlur()` (applies when the field is left) or `->deferred()`. The app-wide default is `filter_update` (`defer`, `live`, `change`, `blur`), with `filter_debounce` (500 ms). The package writes the right `wire:model` modifier for Livewire 3 or 4. Blade filter components receive it as a `wire:model…` attribute; read it with `$attributes->wire('model')` or `$attributes->whereStartsWith('wire:model')`. Changing a filter returns to page 1.
 - Inside the report, `$this->getFilter('key')` returns the current value, or `false` when it is not set.
 - Applied filters show as removable chips in the viewer and appear in every export header.
 
@@ -369,11 +370,11 @@ Set `presets.enabled = true` and run `php artisan migrate`. Signed-in users can 
 | Area | Keys |
 |---|---|
 | Resolution | `report_namespace`, `report_suffix`, `reports` |
-| Route and security | `route_prefix` (`ireport`), `route_middleware` (`['web']`), `route_throttle`, `token_ttl`, `token_bind_user`, `use_cache_token` |
-| Viewer | `viewer_mode` (`iframe`/`inline`), `default_pagination`, `default_pagination_list`, `max_per_page`, `show_search`, `show_reset_button`, `show_filter_button`, `show_export_button`, `show_pagination`, `export_options` |
+| Route and security | `route_prefix` (`ireport`), `route_middleware` (`['web']`), `route_throttle` (off by default; e.g. `'60,1'`), `token_ttl`, `token_bind_user`, `use_cache_token` |
+| Viewer | `filter_update` (`defer` default/`live`/`change`/`blur`), `filter_debounce` (500), `viewer_mode` (`iframe`/`inline`), `default_pagination`, `default_pagination_list`, `max_per_page`, `show_search`, `show_reset_button`, `show_filter_button`, `show_export_button`, `show_pagination`, `export_options` |
 | Look | `branding.*`, `default_style.th\|td\|tr\|zebra\|group\|aggregate`, `header_view` |
 | Exports | `excel_mode`, `export_chunk_size`, `export_memory_limit`, `export_time_limit`, `csv.delimiter\|bom\|title_rows` |
-| Export source | `export_source` (`columns`/`view`), `columns_hideable` |
+| Export source | `export_source` (`columns`/`view`), `columns_hideable`, `eager_load_relations` (default true: relation columns also eager load their relation, so views can use `$row->relation`) |
 | Print and PDF | `stream_threshold`, `print.split_after`, `print.rows_per_part`, `pdf_paper_size`, `pdf_orientation`, `page_setup.enabled\|font_size\|scale\|papers\|font_sizes\|scales`, `pdf_chunk_size`, `pdf_chunk_page_break`, `pdf_chunk_separator`, `pdf_header_view`, `pdf_footer_view`, `mpdf` (margins and other mPDF options) |
 | Queue | `queue.enabled\|thresholds\|threshold\|connection\|queue\|disk\|path\|table\|keep_days\|poll_seconds\|realtime\|broadcast_channel\|fallback_poll_seconds` |
 | Presets | `presets.enabled\|table` |

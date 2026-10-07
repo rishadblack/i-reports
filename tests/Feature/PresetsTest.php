@@ -34,6 +34,7 @@ it('saves, lists, applies and deletes presets for the signed-in user', function 
         ->assertSet('presets_enabled', true)
         ->assertSee('Saved views')
         ->set('filters.city', 'Khulna')
+        ->call('filterSubmit')
         ->set('search', 'ali')
         ->call('sortBy', 'amount')
         ->set('preset_name', ' Khulna only ')
@@ -107,9 +108,11 @@ it('overwrites a preset saved with the same name', function () {
 
     Livewire::test(ReportViewer::class, ['report' => 'customers'])
         ->set('filters.city', 'Khulna')
+        ->call('filterSubmit')
         ->set('preset_name', 'Mine')
         ->call('savePreset')
         ->set('filters.city', 'Dhaka')
+        ->call('filterSubmit')
         ->set('preset_name', 'Mine')
         ->call('savePreset');
 

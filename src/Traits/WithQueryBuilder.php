@@ -87,8 +87,52 @@ trait WithQueryBuilder
         $this->selectFields();
         $this->setBuilder($this->additionalQuery($this->getBuilder()));
         $this->selectPrimaryKey();
+        $this->eagerLoadRelationColumns();
 
         return $this->getBuilder();
+    }
+
+    /**
+     * Eager load the relations behind relation columns ("country.name" loads country), so views
+     * and format() callbacks can use $row->country without lazy loading, as in 0.1.x. The
+     * column values themselves come from the joins. Off with config i-reports.eager_load_relations.
+     */
+    protected function eagerLoadRelationColumns(): void
+    {
+        $builder = $this->getBuilder();
+
+        if (! config('i-reports.eager_load_relations', true) || ! empty($builder->getQuery()->groups) || $builder->getQuery()->distinct) {
+            return;
+        }
+
+        $model = $builder->getModel();
+
+        foreach ($this->getSelectedColumnsForQuery() as $column) {
+            if (! $column->hasRelations()) {
+                continue;
+            }
+
+            $builder->with($column->getRelationString());
+            $first = $model->{$column->getRelations()->first()}();
+
+            // A belongs-to relation needs its foreign key to load.
+            if ($first instanceof BelongsTo && ! $this->selectsColumn($builder, $first->getQualifiedForeignKeyName())) {
+                $builder->addSelect($first->getQualifiedForeignKeyName());
+            }
+        }
+    }
+
+    protected function selectsColumn(Builder $builder, string $qualified): bool
+    {
+        [$table, $name] = array_pad(explode('.', $qualified, 2), 2, '');
+
+        foreach ((array) $builder->getQuery()->columns as $column) {
+            if ($column === '*' || $column === "{$table}.*" || $column === $qualified || $column === $name) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -168,7 +212,8 @@ trait WithQueryBuilder
      */
     public function total(): int
     {
-        return $this->baseBuilder()->toBase()->getCountForPagination();
+        // Counted on the full report query, so where/groupBy/having added in additionalQuery() count too.
+        return (clone $this->exportBuilder())->reorder()->toBase()->getCountForPagination();
     }
 
     /**
@@ -253,7 +298,14 @@ trait WithQueryBuilder
             ->map(fn (Column $column) => $column->getColumn())
             ->all();
 
-        $extraFields = $this->getSearchField();
+        // A custom (not selected) searchable column is searched by its name, as in 0.1.x:
+        // "field" on the base table, or "relation.field" through whereHas.
+        $customFields = $this->getColumns()
+            ->filter(fn (Column $column) => $column->isSearchable() && $column->isCustom())
+            ->map(fn (Column $column) => $column->getName())
+            ->all();
+
+        $extraFields = array_values(array_unique([...$customFields, ...$this->getSearchField()]));
 
         if (count($searchableColumns) > 0 || count($extraFields) > 0) {
             $this->getBuilder()->where(function (Builder $query) use ($searchableColumns, $extraFields, $search) {
@@ -271,23 +323,36 @@ trait WithQueryBuilder
     }
 
     /**
-     * Search an extra field: "field", "col->json.key" or "relation.nested.field".
+     * Search an extra field: "field", "relation.nested.field", "col->json.path" or
+     * "relation.col->json.path". JSON values are compared case-insensitively.
      */
     protected function applySearchField(Builder $query, string $field, string $search): void
     {
-        $segments = explode('.', $field);
+        [$path, $jsonPath] = array_pad(explode('->', $field, 2), 2, null);
+        $segments = explode('.', $path);
         $column = array_pop($segments);
         $relationPath = implode('.', $segments);
 
+        $constrain = function (Builder $target, string $method) use ($column, $jsonPath, $search): void {
+            $qualified = $target->getModel()->getTable().'.'.$column;
+
+            if ($jsonPath === null || $jsonPath === '') {
+                $target->{$method}($qualified, $this->likeOperator($target), "%{$search}%");
+
+                return;
+            }
+
+            $wrapped = $target->getQuery()->getGrammar()->wrap($qualified.'->'.str_replace('.', '->', $jsonPath));
+            $target->{$method.'Raw'}("LOWER({$wrapped}) LIKE ?", ['%'.mb_strtolower($search).'%']);
+        };
+
         if ($relationPath === '') {
-            $query->orWhere($query->getModel()->getTable().'.'.$column, $this->likeOperator($query), "%{$search}%");
+            $constrain($query, 'orWhere');
 
             return;
         }
 
-        $query->orWhereHas($relationPath, function (Builder $relationQuery) use ($column, $search) {
-            $relationQuery->where($relationQuery->getModel()->getTable().'.'.$column, $this->likeOperator($relationQuery), "%{$search}%");
-        });
+        $query->orWhereHas($relationPath, fn (Builder $relationQuery) => $constrain($relationQuery, 'where'));
     }
 
     protected function likeOperator(Builder $query): string
