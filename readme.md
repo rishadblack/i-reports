@@ -1,8 +1,8 @@
 # rishadblack/i-reports
 
-Paginated, filterable Laravel reports with a Livewire viewer and print, PDF, Excel and CSV export, all from one report class and one Blade view.
+Paginated, filterable Laravel reports with a Livewire viewer and print, PDF, Excel and CSV export, all from one report class (a Blade view is optional).
 
-- One class describes the query, columns and filters. One Blade view renders the table.
+- One class describes the query, columns and filters. Reports render through the package's default grid; add a Blade view only to customize the markup.
 - A Bootstrap 5.3 Livewire viewer adds search, filters, sorting, paging, saved presets and an export menu.
 - Exports stream from the database: CSV is written row by row, Excel in chunks, PDF through mpdf. Large exports can run on the queue.
 - Every cell is escaped by default. The report route only accepts short-lived, user-bound tokens.
@@ -32,10 +32,18 @@ Set the namespace and suffix so reports live in their own folder, and add `auth`
 php artisan make:report users
 ```
 
-This creates `App\Livewire\Reports\UsersReport`, the view `resources/views/livewire/reports/users-report.blade.php` and a Pest test. Embed the viewer anywhere:
+This creates `App\Livewire\Reports\UsersReport` and a Pest test; the report renders through the package's default grid view. Embed the viewer anywhere:
 
 ```blade
 <livewire:i-reports.report-viewer report="users" />
+```
+
+Need custom markup? Copy the default view into the app and edit it — the report picks it up automatically because an existing view at the conventional path always wins over the package default:
+
+```bash
+php artisan i-reports:view users          # resources/views/livewire/reports/users-report.blade.php
+# or scaffold class + view together:
+php artisan make:report users --view
 ```
 
 ### The report class

@@ -44,6 +44,14 @@ it('resolves the view name from the class', function () {
         ->and(app(GroupedCustomersReport::class)->getViewName())->toBe('livewire.reports.grouped-customers-report');
 
     config()->set('modules.namespace', 'Modules');
+    view()->addNamespace('billing', __DIR__.'/../Fixtures/Modules/Billing/resources/views');
 
     expect(app(InvoicesReport::class)->getViewName())->toBe('billing::livewire.reports.invoices-report');
+});
+
+it('falls back to the package default view when the derived view does not exist', function () {
+    // Module namespace set, but no billing view namespace is registered here.
+    config()->set('modules.namespace', 'Modules');
+
+    expect(app(InvoicesReport::class)->getViewName())->toBe('i-reports::default-report');
 });

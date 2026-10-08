@@ -5,18 +5,22 @@ namespace Rishadblack\IReports\Console;
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Str;
+use Rishadblack\IReports\Console\Concerns\ResolvesReportScaffolding;
 use Symfony\Component\Console\Attribute\AsCommand;
 
 #[AsCommand(name: 'make:report')]
 class MakeReportCommand extends Command
 {
+    use ResolvesReportScaffolding;
+
     protected $signature = 'make:report
         {name : Report name in dot notation, e.g. users or sales.daily}
         {--model= : Model class the report queries (defaults to a guess from the name)}
+        {--view : Also create a Blade view to customize (without it the package default view renders the report)}
         {--no-test : Skip the Pest test}
         {--force : Overwrite existing files}';
 
-    protected $description = 'Create a report class, its Blade view and a Pest test';
+    protected $description = 'Create a report class and a Pest test; pass --view when the report needs a custom Blade view';
 
     public function __construct(protected Filesystem $files)
     {
@@ -27,48 +31,36 @@ class MakeReportCommand extends Command
     {
         $name = trim((string) $this->argument('name'));
 
-        if (! preg_match('/^[a-zA-Z0-9.\-]+$/', $name)) {
+        if (! $this->isValidReportName($name)) {
             $this->error('Report names may contain only letters, digits, dots and dashes.');
 
             return self::FAILURE;
         }
 
-        $segments = collect(explode('.', $name))->map(fn (string $segment) => Str::studly($segment));
-        $suffix = (string) config('i-reports.report_suffix', '');
-        $className = $segments->last().$suffix;
-        $subNamespace = $segments->slice(0, -1)->implode('\\');
-        $livewireNamespace = (string) config('livewire.class_namespace', 'App\\Livewire');
-        $reportNamespace = trim((string) config('i-reports.report_namespace', ''), '\\');
-        $namespace = collect([$livewireNamespace, $reportNamespace, $subNamespace])->filter()->implode('\\');
-        $fullClass = $namespace.'\\'.$className;
+        $class = $this->reportClassParts($name, $this->option('model'));
+        $view = $this->reportViewParts($name);
 
-        $modelName = $this->option('model') ?: Str::studly(Str::singular($segments->last()));
-        $modelClass = str_contains($modelName, '\\') ? $modelName : 'App\\Models\\'.$modelName;
-
-        $viewParts = collect(explode('\\', Str::after($fullClass, $livewireNamespace.'\\')))
-            ->prepend('livewire')
-            ->map(fn (string $part) => Str::kebab($part));
-        $viewName = $viewParts->implode('.');
-        $viewPath = resource_path('views/'.$viewParts->implode('/').'.blade.php');
-
-        $classPath = $this->classPath($fullClass);
-        $testPath = base_path('tests/Feature/'.$className.'Test.php');
+        $classPath = $this->classPath($class['fullClass']);
+        $testPath = base_path('tests/Feature/'.$class['class'].'Test.php');
 
         $replacements = [
-            '{{ namespace }}' => $namespace,
-            '{{ class }}' => $className,
-            '{{ fullClass }}' => $fullClass,
-            '{{ model }}' => $modelClass,
-            '{{ modelShort }}' => class_basename($modelClass),
-            '{{ title }}' => Str::title(str_replace('-', ' ', Str::kebab($segments->last()))),
+            '{{ namespace }}' => $class['namespace'],
+            '{{ class }}' => $class['class'],
+            '{{ fullClass }}' => $class['fullClass'],
+            '{{ model }}' => $class['model'],
+            '{{ modelShort }}' => class_basename($class['model']),
+            '{{ title }}' => $class['title'],
             '{{ report }}' => $name,
-            '{{ view }}' => $viewName,
+            '{{ view }}' => $view['name'],
         ];
 
         $written = [
             $this->write($classPath, 'report.stub', $replacements),
-            $this->write($viewPath, 'report-view.stub', $replacements),
         ];
+
+        if ($this->option('view')) {
+            $written[] = $this->write($view['path'], 'report-view.stub', $replacements);
+        }
 
         if (! $this->option('no-test')) {
             $written[] = $this->write($testPath, 'report-test.stub', $replacements);
@@ -79,6 +71,10 @@ class MakeReportCommand extends Command
         }
 
         $this->info("Report [{$name}] created. Embed it with <livewire:i-reports.report-viewer report=\"{$name}\" />");
+
+        if (! $this->option('view')) {
+            $this->line("It renders with the package's default view. Customize it later with: php artisan i-reports:view {$name}");
+        }
 
         return self::SUCCESS;
     }

@@ -8,7 +8,7 @@ metadata:
 
 # I-Reports Development
 
-`rishadblack/i-reports` turns an Eloquent query into a report. You write **one class** (query, columns, filters) and **one Blade view**. The package provides everything else:
+`rishadblack/i-reports` turns an Eloquent query into a report. You write **one class** (query, columns, filters) — a Blade view is optional and only needed for custom markup. The package provides everything else:
 
 - a Bootstrap 5.3 Livewire viewer: search, filter dialog with chips, sorting, pagination, a column picker, saved views, an export menu and a background exports panel;
 - a token-protected route that renders the report in an iframe (or inline);
@@ -19,7 +19,7 @@ metadata:
 
 ## Rules That Matter Most
 
-1. **Never write controllers, routes, export classes or JavaScript for a report.** One report class plus one Blade view, shown with `<livewire:i-reports.report-viewer report="..." />`.
+1. **Never write controllers, routes, export classes or JavaScript for a report.** One report class plus a Blade view only when the markup is custom, shown with `<livewire:i-reports.report-viewer report="..." />`.
 2. **`builder()` and `authorize()` are the security boundary.** Scope `builder()` to the current user or tenant on shared tables. Add `auth` to `i-reports.route_middleware` for private data. Tokens stop tampering with parameters, but they are not an access check.
 3. **Qualify every base-table column** (`users.country_id`, not `country_id`) in filters, `setDefaultSort()`, `additionalQuery()` and `search()`. Relation columns add joins, so unqualified names become ambiguous.
 4. **Cell output is escaped.** Use `->html()` only when `format()` returns trusted markup, and wrap user data in `e()` inside it.
@@ -29,8 +29,9 @@ metadata:
 ## Quick Start
 
 ```bash
-php artisan make:report users                       # class + Blade view + Pest test
-php artisan make:report sales.daily --model=App\\Models\\Sale
+php artisan make:report users                       # class + Pest test (renders the package's default grid)
+php artisan make:report sales.daily --model=App\\Models\\Sale --view   # also scaffold a Blade view to customize
+php artisan i-reports:view users                    # copy the default view for an existing report, then customize it
 php artisan i-reports:list                          # registered reports
 ```
 
@@ -65,6 +66,7 @@ That page now has search, filters, sorting, paging, a column picker and exports.
 | `billing::invoices` | `Modules\Billing\Livewire\Reports\InvoicesReport` | `billing::livewire.reports.invoices-report` |
 
 - The class is `{livewire.class_namespace}\{i-reports.report_namespace}\{StudlyName}{i-reports.report_suffix}`. Names may contain letters, digits, `.` and `-`; an unknown name returns 404.
+- **The view column is optional.** When no view exists at that path, every output (viewer, print, PDF, Excel, CSV) renders through the package's default grid (`i-reports::default-report`). Create a view only to customize: `php artisan i-reports:view {name}` copies the default, and an existing app view always wins over the package default.
 - To map a name explicitly, use `IReports::register('alias', SomeReport::class)` or the `reports` config array.
 
 ## The Report Class
@@ -251,7 +253,7 @@ Available variables:
 - `$export`: `view`, `inline`, `print`, `pdf`, `xlsx` or `csv`.
 - `$report`, `$report_title`, `$header_title`.
 
-The plain grid is the fastest option, and `make:report` generates it:
+Without an app view, the package's default grid renders (same markup as below). `i-reports:view {name}` or `make:report {name} --view` writes this starting point:
 
 ```blade
 <x-i-reports::layout>

@@ -549,7 +549,27 @@ trait Helpers
     |--------------------------------------------------------------------------
     */
 
+    /**
+     * The report's Blade view: the view that follows the class name when the
+     * application has created it, otherwise the package's default grid. Copy
+     * the default into the app with `php artisan i-reports:view {report}`.
+     */
     public function getViewName(): string
+    {
+        $viewName = $this->resolveCustomViewName();
+
+        if ($viewName !== null && view()->exists($viewName)) {
+            return $viewName;
+        }
+
+        return 'i-reports::default-report';
+    }
+
+    /**
+     * Derive the conventional view name from the report class, or null when
+     * the class lives outside the known Livewire namespaces.
+     */
+    protected function resolveCustomViewName(): ?string
     {
         $fullClassName = get_class($this);
         $namespaceParts = explode('\\', $fullClassName);
@@ -562,7 +582,7 @@ trait Helpers
             $livewireIndex = array_search($moduleLivewireNamespace, $namespaceParts, true);
 
             if ($livewireIndex === false) {
-                throw new \RuntimeException("Livewire namespace '{$moduleLivewireNamespace}' not found in: {$fullClassName}");
+                return null;
             }
 
             $componentParts = collect(array_slice($namespaceParts, $livewireIndex))
@@ -581,7 +601,7 @@ trait Helpers
                 ->implode('.');
         }
 
-        throw new \RuntimeException("Unable to resolve Livewire view name for: {$fullClassName}");
+        return null;
     }
 
     /*

@@ -10,6 +10,7 @@ use Livewire\Livewire;
 use Rishadblack\IReports\Console\ExportReportCommand;
 use Rishadblack\IReports\Console\ListReportsCommand;
 use Rishadblack\IReports\Console\MakeReportCommand;
+use Rishadblack\IReports\Console\MakeReportViewCommand;
 use Rishadblack\IReports\Console\PruneExportsCommand;
 use Rishadblack\IReports\Contracts\ReportRenderer;
 use Rishadblack\IReports\Http\Livewire\ReportViewer;
@@ -96,6 +97,7 @@ class IReportsServiceProvider extends ServiceProvider
 
         $this->commands([
             MakeReportCommand::class,
+            MakeReportViewCommand::class,
             ExportReportCommand::class,
             ListReportsCommand::class,
             PruneExportsCommand::class,

@@ -67,34 +67,48 @@ it('fails for bad formats, unknown reports and unauthorized reports', function (
     expect(fn () => $this->artisan('i-reports:export', ['report' => 'nope', '--format' => 'csv']))->toThrow(NotFoundHttpException::class);
 });
 
-it('scaffolds a report class, view and test', function () {
-    $paths = [
-        app_path('Livewire/Reports/OrdersReport.php'),
-        resource_path('views/livewire/reports/orders-report.blade.php'),
-        base_path('tests/Feature/OrdersReportTest.php'),
-    ];
+it('scaffolds a report class and test, with the view only on demand', function () {
+    $classPath = app_path('Livewire/Reports/OrdersReport.php');
+    $viewPath = resource_path('views/livewire/reports/orders-report.blade.php');
+    $testPath = base_path('tests/Feature/OrdersReportTest.php');
 
     try {
         $this->artisan('make:report', ['name' => 'orders', '--model' => 'App\\Models\\Customer'])->assertSuccessful();
 
-        foreach ($paths as $path) {
-            expect(File::exists($path))->toBeTrue($path);
-        }
+        expect(File::exists($classPath))->toBeTrue($classPath)
+            ->and(File::exists($testPath))->toBeTrue($testPath)
+            ->and(File::exists($viewPath))->toBeFalse('the view is only created with --view');
 
-        expect(File::get($paths[0]))
+        expect(File::get($classPath))
             ->toContain('namespace App\Livewire\Reports;')
             ->toContain('class OrdersReport extends BaseReportController')
             ->toContain('use App\Models\Customer;')
             ->toContain('Customer::query()')
-            ->and(File::get($paths[1]))->toContain('<x-i-reports::layout>')
-            ->and(File::get($paths[2]))->toContain("'report' => 'orders'");
+            ->and(File::get($testPath))->toContain("'report' => 'orders'");
+
+        $this->artisan('make:report', ['name' => 'orders', '--force' => true, '--no-test' => true, '--view' => true])->assertSuccessful();
+
+        expect(File::get($viewPath))->toContain('<x-i-reports::layout>');
 
         $this->artisan('make:report', ['name' => 'orders'])->assertFailed();
-        $this->artisan('make:report', ['name' => 'orders', '--force' => true, '--no-test' => true])->assertSuccessful();
         $this->artisan('make:report', ['name' => 'bad name!'])->assertFailed();
     } finally {
-        foreach ($paths as $path) {
-            File::delete($path);
-        }
+        File::delete([$classPath, $viewPath, $testPath]);
+    }
+});
+
+it('copies the default view for an existing report with i-reports:view', function () {
+    $viewPath = resource_path('views/livewire/reports/sales/daily-report.blade.php');
+
+    try {
+        $this->artisan('i-reports:view', ['name' => 'sales.daily'])->assertSuccessful();
+
+        expect(File::get($viewPath))->toContain('<x-i-reports::layout>');
+
+        $this->artisan('i-reports:view', ['name' => 'sales.daily'])->assertFailed();
+        $this->artisan('i-reports:view', ['name' => 'sales.daily', '--force' => true])->assertSuccessful();
+        $this->artisan('i-reports:view', ['name' => 'bad name!'])->assertFailed();
+    } finally {
+        File::delete($viewPath);
     }
 });

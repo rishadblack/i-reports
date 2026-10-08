@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.0] - 2026-10-08
+
+### Added
+
+- Reports no longer need their own Blade view: when no view exists at the conventional path, every output
+  (viewer, print, PDF, Excel, CSV) renders through the package's new default grid view
+  (`i-reports::default-report`, group-by aware). An existing app view always wins.
+- `php artisan i-reports:view {name}` copies the default view to the report's conventional path so it can
+  be customized, and `make:report` gained a `--view` flag to scaffold class and view together.
+
+### Changed
+
+- `make:report` no longer creates a Blade view by default (the default grid renders the report); pass
+  `--view` for the old behaviour.
+- A report class whose namespace cannot be mapped to a view name now renders the default view instead of
+  throwing a `RuntimeException`.
+
 ## [2.0.2] - 2026-10-08
 
 ### Changed
