@@ -13,12 +13,58 @@
         @endif
 
         @if ($export === 'view')
+        @include('i-reports::partials.screen-theme')
+
+        html,
+        body {
+            background-color: var(--ir-page-bg);
+            color: var(--ir-text);
+        }
+
+        [data-bs-theme="dark"] {
+            color-scheme: dark;
+        }
+
         thead th {
             position: sticky;
             top: 0;
         }
         @endif
     </style>
+    @if ($export === 'view')
+        <script>
+            {{-- Follow the data-bs-theme of the page embedding this report; opened on its own, follow the OS. --}}
+            (function () {
+                var root = document.documentElement;
+                var media = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+                var host = null;
+
+                try {
+                    host = window.parent !== window ? window.parent.document : null;
+                } catch (e) {}
+
+                var apply = function () {
+                    var theme = host
+                        ? (host.documentElement.getAttribute('data-bs-theme') || (host.body && host.body.getAttribute('data-bs-theme')) || 'light')
+                        : (media && media.matches ? 'dark' : 'light');
+
+                    root.setAttribute('data-bs-theme', theme === 'dark' ? 'dark' : 'light');
+                };
+
+                apply();
+
+                if (host && window.MutationObserver) {
+                    var observer = new MutationObserver(apply);
+                    observer.observe(host.documentElement, { attributes: true, attributeFilter: ['data-bs-theme'] });
+                    if (host.body) {
+                        observer.observe(host.body, { attributes: true, attributeFilter: ['data-bs-theme'] });
+                    }
+                } else if (media && media.addEventListener) {
+                    media.addEventListener('change', apply);
+                }
+            })();
+        </script>
+    @endif
     @stack('styles')
 </head>
 <body>

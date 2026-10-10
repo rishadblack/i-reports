@@ -349,6 +349,12 @@ it('renders the report inline with one count and one select per interaction', fu
     $component->call('sortBy', 'name')->assertSeeHtml('&#9650;')->assertSeeHtml("wire:click.prevent=\"sortBy('name')\"");
 });
 
+it('themes the inline report with the page palette', function () {
+    Livewire::test(ReportViewer::class, ['report' => 'customers', 'mode' => 'inline'])
+        ->assertSeeHtml('[data-bs-theme="dark"]')
+        ->assertSeeHtml('color: var(--ir-td-color, #1f2937)');
+});
+
 it('renders the bootstrap 5.3 card with title, export menu, pagination and filter dialog', function () {
     Livewire::test(ReportViewer::class, ['report' => 'customers'])
         ->assertSee('Customer List')

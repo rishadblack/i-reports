@@ -79,10 +79,12 @@ class ReportContext
 
     /**
      * A config('i-reports.default_style') entry, with the chosen print/PDF font size applied.
+     * On screen (view, inline) the theme-aware config('i-reports.screen_style') entry wins when set.
      */
     public function defaultStyle(string $key): string
     {
-        $style = (string) config("i-reports.default_style.{$key}", '');
+        $screenStyle = $this->isScreen() ? config("i-reports.screen_style.{$key}") : null;
+        $style = (string) ($screenStyle ?? config("i-reports.default_style.{$key}", ''));
         $setup = $this->get('page_setup');
 
         // Font size applies to cells only, not to row or stripe styles.
@@ -94,6 +96,14 @@ class ReportContext
         $export = $this->requestData['export'] ?? 'view';
 
         return in_array($export, self::EXPORTS, true) ? $export : 'view';
+    }
+
+    /**
+     * Rendered for the on-screen viewer (iframe or inline), not for print or a download.
+     */
+    public function isScreen(): bool
+    {
+        return in_array($this->getExport(), ['view', 'inline'], true);
     }
 
     public function isDownload(): bool

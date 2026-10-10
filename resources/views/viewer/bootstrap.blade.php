@@ -257,9 +257,10 @@
         </div>
 
         @if ($mode === 'iframe')
-            <iframe src="{{ $reportUrl }}" title="{{ $this->reportTitle() }}" class="d-block w-100 border-0 bg-white" style="height: calc(100vh - 300px); min-height: 420px;"></iframe>
+            <iframe src="{{ $reportUrl }}" title="{{ $this->reportTitle() }}" class="d-block w-100 border-0 bg-body" style="height: calc(100vh - 300px); min-height: 420px;"></iframe>
         @else
             <div class="i-reports-inline table-responsive p-2">
+                <style>@include('i-reports::partials.screen-theme')</style>
                 {!! $reportHtml !!}
             </div>
         @endif

@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.1] - 2026-10-10
+
+### Added
+
+- The on-screen report (iframe and inline viewer modes) follows Bootstrap 5.3's light and dark mode. The iframe
+  reads the embedding page's `data-bs-theme` and switches live when it changes; opened on its own it follows the
+  OS colour scheme.
+- `screen_style` config: theme-aware cell styles for the viewer built on `--ir-*` CSS variables (light values match
+  `default_style`). A key set to `null` falls back to `default_style`. Print, PDF and Excel keep `default_style`.
+
+### Fixed
+
+- Inline mode in dark mode no longer renders dark cell text on the dark page background.
+
 ## [2.1.0] - 2026-10-08
 
 ### Added

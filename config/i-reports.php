@@ -112,6 +112,18 @@ return [
         'aggregate' => 'font-weight: bold; font-size: 9pt; color: #1f2937; background-color: #eef2f6; padding: 6px 8px; border: 1px solid #cbd5e1;',
     ],
 
+    // On-screen styles (the viewer's iframe and inline modes). They read --ir-* CSS variables that
+    // follow Bootstrap 5.3's data-bs-theme (light / dark); the fallbacks match default_style.
+    // A key set to null uses default_style; print, PDF and Excel always use default_style.
+    'screen_style' => [
+        'th' => 'text-align: left; font-size: 9pt; font-weight: bold; color: var(--ir-th-color, #ffffff); background-color: var(--ir-th-bg, #1f2937); padding: 6px 8px; border: 1px solid var(--ir-th-border, #1f2937);',
+        'td' => 'text-align: left; font-size: 9pt; color: var(--ir-td-color, #1f2937); padding: 5px 8px; border: 1px solid var(--ir-td-border, #e5e7eb);',
+        'tr' => '',
+        'zebra' => 'background-color: var(--ir-zebra-bg, #f8fafc);',
+        'group' => 'font-weight: bold; font-size: 9pt; color: var(--ir-group-color, #1f2937); background-color: var(--ir-group-bg, #e8edf3); padding: 6px 8px; border: 1px solid var(--ir-group-border, #d5dde6);',
+        'aggregate' => 'font-weight: bold; font-size: 9pt; color: var(--ir-aggregate-color, #1f2937); background-color: var(--ir-aggregate-bg, #eef2f6); padding: 6px 8px; border: 1px solid var(--ir-aggregate-border, #cbd5e1);',
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Exports

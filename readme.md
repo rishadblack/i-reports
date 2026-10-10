@@ -149,6 +149,8 @@ mPDF itself needs about 3 seconds per 1000 table rows, so a 100k-row PDF takes m
 
 Set `viewer_mode` to `inline` to render the table inside the Livewire component instead of an iframe. Sorting then works with `wire:click` and each interaction is one request.
 
+Both modes follow Bootstrap 5.3's light and dark mode: the report reads the `data-bs-theme` of the page around it (the iframe also switches live when the page toggles it; opened on its own it follows the OS). On-screen cells use `config('i-reports.screen_style')`, whose `--ir-*` CSS variables change with the theme; print, PDF and Excel always use the fixed `default_style`. Set a `screen_style` key to `null` to use `default_style` on screen as well.
+
 ## Report settings
 
 All setters are called in `configure()`.

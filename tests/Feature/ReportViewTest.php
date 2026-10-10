@@ -314,3 +314,25 @@ it('makes sortable headers clickable in the iframe', function () {
         ->assertSee('i-reports:sort', false)
         ->assertSee('&#9650;', false);
 });
+
+it('themes the on-screen report with the embedding page and keeps print colours fixed', function () {
+    $screen = $this->get(reportUrl())->assertOk();
+    $print = $this->get(reportUrl(['export' => 'print']))->assertOk();
+
+    $screen->assertSee('[data-bs-theme="dark"]', false)
+        ->assertSee('window.parent.document', false)
+        ->assertSee('color: var(--ir-td-color, #1f2937)', false);
+
+    $print->assertSee('font-size: 9pt; color: #1f2937; padding', false)
+        ->assertDontSee('--ir-td-color', false)
+        ->assertDontSee('window.parent.document', false);
+});
+
+it('uses default_style on screen for a screen_style key set to null', function () {
+    config()->set('i-reports.screen_style.td', null);
+
+    $this->get(reportUrl())
+        ->assertOk()
+        ->assertSee('font-size: 9pt; color: #1f2937; padding', false)
+        ->assertSee('var(--ir-th-bg, #1f2937)', false);
+});
